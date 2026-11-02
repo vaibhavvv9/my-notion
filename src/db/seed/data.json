@@ -1,0 +1,2080 @@
+[
+ {
+  "name": "Frontend Engineering",
+  "icon": "🎨",
+  "description": "JavaScript, React, the browser and everything it takes to ship fast, accessible, secure UIs.",
+  "topics": [
+   {
+    "title": "JavaScript Fundamentals",
+    "icon": "⚡",
+    "summary": "Types, scope, closures, this, prototypes and the event loop: the questions every frontend loop starts with.",
+    "difficulty": "beginner",
+    "tags": [
+     "javascript",
+     "core"
+    ],
+    "sections": {
+     "concept": "JavaScript is a single-threaded, dynamically typed, prototype-based language with first-class functions. Almost every \"tricky\" interview question comes back to four mechanics: **scope and closures**, **how `this` is bound**, **prototypal inheritance**, and **the event loop**. If you can explain those from first principles, you can reason through any output-prediction question instead of memorising answers.",
+     "fundamentals": "- **Types**: 7 primitives (`string`, `number`, `bigint`, `boolean`, `undefined`, `symbol`, `null`) plus `object`. Primitives are copied by value; objects by reference.\n- **`var` / `let` / `const`**: `var` is function-scoped and hoisted as `undefined`; `let`/`const` are block-scoped and live in the *temporal dead zone* until declared.\n- **Equality**: `===` compares without coercion. `==` coerces (`null == undefined` is `true`, `0 == ''` is `true`). Default to `===`.\n- **Truthiness**: falsy values are `false, 0, -0, 0n, '', null, undefined, NaN`. Everything else, including `[]` and `{}`, is truthy.\n- **Functions**: declarations are hoisted fully; function expressions and arrows are not. Arrows have no own `this`, `arguments` or `prototype`.\n- **Closures**: a function keeps access to the variables of the scope where it was *defined*, even after that scope returns.\n- **`this`**: decided at *call time*: `new` > explicit (`call/apply/bind`) > implicit (`obj.fn()`) > default (`undefined` in strict mode, `globalThis` otherwise).",
+     "advanced": "- **Event loop**: call stack runs to completion, then *all* microtasks (promise callbacks, `queueMicrotask`, `MutationObserver`) drain, then the browser may render, then one macrotask (`setTimeout`, I/O, events) runs.\n- **Prototype chain**: property lookup walks `obj → obj.__proto__ → … → Object.prototype → null`. `class` is syntax sugar over this.\n- **Memory & GC**: mark-and-sweep from roots. Leaks come from forgotten timers, detached DOM nodes kept in closures, global caches and listeners never removed. `WeakMap`/`WeakRef` help.\n- **Iterators & generators**: `Symbol.iterator` powers `for…of`, spread and destructuring; generators are pausable functions that make lazy sequences easy.\n- **Property descriptors**: `writable`, `enumerable`, `configurable`, getters/setters, `Object.freeze` (shallow!).",
+     "examples": "```js\n// Classic closure-in-loop question\nfor (var i = 0; i < 3; i++) setTimeout(() => console.log(i)); // 3 3 3\nfor (let j = 0; j < 3; j++) setTimeout(() => console.log(j)); // 0 1 2\n\n// Event loop ordering\nconsole.log('A');\nsetTimeout(() => console.log('B'));\nPromise.resolve().then(() => console.log('C'));\nconsole.log('D');\n// A D C B\n\n// Implement debounce: a closure holding the timer\nfunction debounce(fn, wait) {\n  let t;\n  return function (...args) {\n    clearTimeout(t);\n    t = setTimeout(() => fn.apply(this, args), wait);\n  };\n}\n```",
+     "useCases": "- Closures power module patterns, memoisation, `debounce`/`throttle` and React hooks' captured state.\n- Understanding the event loop explains why a long `for` loop freezes the UI and why `await` in a loop is sequential.\n- Prototype knowledge matters when reading library code, polyfilling, or debugging `instanceof` across iframes.",
+     "mistakes": "- Saying \"JavaScript is pass-by-reference\". It is always pass-by-value; for objects, the *value* is a reference.\n- Thinking `setTimeout(fn, 0)` runs immediately; it waits for the stack and all microtasks.\n- Losing `this` when passing methods as callbacks (`button.onclick = obj.handle`).\n- Believing `const` makes objects immutable; it only prevents rebinding.\n- `typeof null === 'object'` is a historic bug, not proof that null is an object."
+    },
+    "questions": [
+     {
+      "question": "What is a closure? Give a practical example.",
+      "answer": "A closure is a function bundled with references to the variables in its lexical scope. The inner function can read and update those variables even after the outer function has returned.\n\n```js\nfunction counter() {\n  let count = 0;\n  return { inc: () => ++count, get: () => count };\n}\nconst c = counter(); c.inc(); c.get(); // 1\n```\nPractical uses: data privacy, memoisation caches, `debounce`, partial application, and React hooks capturing props/state.",
+      "followUps": "- What is a *stale closure* in React and how do you fix it?\n- How can closures cause memory leaks?\n- Rewrite the `var` loop example so it prints 0 1 2 without using `let`.",
+      "difficulty": "beginner"
+     },
+     {
+      "question": "Explain the event loop, microtasks and macrotasks.",
+      "answer": "JS runs one call stack to completion. When it is empty, the engine drains the **microtask queue** completely (promise reactions, `queueMicrotask`, `MutationObserver`). The browser then gets a chance to **render** (rAF callbacks, style, layout, paint). Then it takes **one macrotask** (timers, events, message channel, I/O) and repeats.\n\nConsequences: promise callbacks always run before `setTimeout(…, 0)`; an infinite chain of microtasks can starve rendering; heavy synchronous work blocks input and paint.",
+      "followUps": "- Where does `requestAnimationFrame` fit in?\n- How does the Node.js event loop differ (phases, `process.nextTick`, `setImmediate`)?\n- How would you break up a long task to keep the UI responsive?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "How is `this` determined in JavaScript?",
+      "answer": "At call time, by these rules in priority order:\n1. **`new` binding**: `this` is the freshly created object.\n2. **Explicit**: `fn.call(obj)`, `fn.apply(obj)`, `fn.bind(obj)`.\n3. **Implicit**: `obj.fn()` makes `this` `obj`.\n4. **Default**: `undefined` in strict mode / modules, otherwise `globalThis`.\n\nArrow functions ignore all of these and capture `this` lexically from the enclosing scope.",
+      "followUps": "- What does `bind` return, and can a bound function be re-bound?\n- Why do class methods lose `this` when passed as callbacks?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Implement `Promise.all` from scratch.",
+      "answer": "```js\nfunction promiseAll(iterable) {\n  return new Promise((resolve, reject) => {\n    const items = Array.from(iterable);\n    const results = new Array(items.length);\n    let remaining = items.length;\n    if (remaining === 0) return resolve(results);\n    items.forEach((item, i) => {\n      Promise.resolve(item).then((value) => {\n        results[i] = value;\n        if (--remaining === 0) resolve(results);\n      }, reject);\n    });\n  });\n}\n```\nKey points interviewers look for: preserve order by index (not completion order), wrap non-promises with `Promise.resolve`, reject fast on the first failure, handle the empty input case.",
+      "followUps": "- Implement `Promise.allSettled`, `Promise.race` and `Promise.any`.\n- Add a concurrency limit (run at most N at a time).",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain hoisting and the temporal dead zone with an example",
+     "Predict output of 5 event-loop ordering puzzles without running them",
+     "Implement debounce, throttle, deep clone and curry from memory",
+     "Explain the four `this` binding rules and arrow function behaviour",
+     "Draw the prototype chain for an object created with `class` and `extends`",
+     "Implement Promise.all and a promise pool with a concurrency limit"
+    ],
+    "resources": [
+     {
+      "title": "MDN: Closures",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures",
+      "kind": "docs"
+     },
+     {
+      "title": "MDN: The event loop",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop",
+      "kind": "docs"
+     },
+     {
+      "title": "Jake Archibald: In The Loop (JSConf)",
+      "url": "https://www.youtube.com/watch?v=cCOL7MC4Pl0",
+      "kind": "video"
+     },
+     {
+      "title": "You Don't Know JS Yet",
+      "url": "https://github.com/getify/You-Dont-Know-JS",
+      "kind": "book"
+     }
+    ],
+    "children": [
+     {
+      "title": "Async JavaScript & Promises",
+      "icon": "🔁",
+      "summary": "Callbacks, promises, async/await, error handling and cancellation.",
+      "difficulty": "intermediate",
+      "tags": [
+       "javascript",
+       "async"
+      ],
+      "sections": {
+       "concept": "Asynchronous JavaScript lets a single thread start work (network, timers, I/O) and continue running while it waits. **Promises** represent a future value with three states (pending, fulfilled, rejected). **`async/await`** is syntax over promises that makes async code read top-to-bottom while still being non-blocking.",
+       "fundamentals": "- A promise settles once; `.then` always runs asynchronously as a microtask.\n- `.then` returns a *new* promise, enabling chaining; returning a promise from a handler flattens it.\n- `async` functions always return a promise; `await` pauses the function, not the thread.\n- Errors: `try/catch` around `await`, or `.catch()` at the end of a chain. Unhandled rejections are reported globally.\n- Combinators: `all` (fail fast), `allSettled` (never rejects), `race` (first settled), `any` (first fulfilled).",
+       "advanced": "- **Cancellation** with `AbortController`: pass `signal` to `fetch`, listen for `abort` in custom tasks.\n- **Sequential vs parallel**: `await` inside `for` runs sequentially; start promises first, then `await Promise.all`.\n- **Async iteration**: `for await…of` over streams and async generators.\n- **Race conditions in UIs**: ignore stale responses with a request id or abort the previous request.",
+       "examples": "```js\n// Parallel, with timeout and cancellation\nasync function fetchWithTimeout(url, ms = 5000) {\n  const ctrl = new AbortController();\n  const id = setTimeout(() => ctrl.abort(), ms);\n  try {\n    const res = await fetch(url, { signal: ctrl.signal });\n    if (!res.ok) throw new Error(`HTTP ${res.status}`);\n    return await res.json();\n  } finally {\n    clearTimeout(id);\n  }\n}\n\nconst [user, posts] = await Promise.all([\n  fetchWithTimeout('/api/user'),\n  fetchWithTimeout('/api/posts'),\n]);\n```",
+       "useCases": "- Search-as-you-type that cancels stale requests.\n- Retrying flaky requests with exponential backoff.\n- Loading independent dashboard widgets in parallel.",
+       "mistakes": "- Forgetting to `return` a promise inside `.then`, breaking the chain.\n- Using `forEach` with `async` callbacks and expecting it to wait.\n- Swallowing errors with an empty `catch`.\n- Treating `fetch` as rejecting on 404/500. It only rejects on network failure."
+      },
+      "questions": [
+       {
+        "question": "What is the difference between `Promise.all`, `allSettled`, `race` and `any`?",
+        "answer": "- **all**: resolves with every value in order; rejects on the *first* rejection.\n- **allSettled**: always resolves with `{status, value | reason}` for each input.\n- **race**: settles like the first input to settle, fulfilled or rejected.\n- **any**: resolves with the first fulfilment; rejects with `AggregateError` only if all reject.",
+        "followUps": "- How would you implement a timeout using `race`?\n- Which would you use to load optional dashboard widgets?",
+        "difficulty": "intermediate"
+       },
+       {
+        "question": "Write a retry helper with exponential backoff.",
+        "answer": "```js\nasync function retry(fn, { retries = 3, base = 200 } = {}) {\n  for (let attempt = 0; ; attempt++) {\n    try {\n      return await fn();\n    } catch (err) {\n      if (attempt >= retries) throw err;\n      const delay = base * 2 ** attempt + Math.random() * base; // jitter\n      await new Promise((r) => setTimeout(r, delay));\n    }\n  }\n}\n```\nMention jitter (avoids thundering herd), only retrying idempotent / retryable errors, and respecting `AbortSignal`.",
+        "followUps": "- Which HTTP status codes are safe to retry?\n- How would you make it cancellable?",
+        "difficulty": "advanced"
+       }
+      ],
+      "checklist": [
+       "Convert a callback API to promises",
+       "Explain why `await` in a loop is sequential and fix it",
+       "Cancel a fetch with AbortController",
+       "Implement retry with backoff and jitter"
+      ],
+      "resources": [
+       {
+        "title": "MDN: Using promises",
+        "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises",
+        "kind": "docs"
+       },
+       {
+        "title": "javascript.info: Promises, async/await",
+        "url": "https://javascript.info/async",
+        "kind": "article"
+       }
+      ],
+      "children": []
+     }
+    ]
+   },
+   {
+    "title": "TypeScript",
+    "icon": "🔷",
+    "summary": "Structural typing, generics, narrowing and utility types for safer frontends.",
+    "difficulty": "intermediate",
+    "tags": [
+     "typescript",
+     "core"
+    ],
+    "sections": {
+     "concept": "TypeScript is a **structural**, gradually typed superset of JavaScript. Types are erased at compile time, so they describe the shape of values rather than enforcing anything at runtime. Interviews focus on **generics**, **narrowing**, **union/intersection types**, **utility and conditional types**, and how you model real data (API responses, component props) safely.",
+     "fundamentals": "- `type` vs `interface`: both describe shapes; interfaces can be merged and extended, types can express unions, tuples and mapped/conditional types.\n- `unknown` is the safe top type (must narrow before use); `any` disables checking; `never` is the empty type.\n- **Narrowing**: `typeof`, `instanceof`, `in`, equality checks, discriminated unions and custom type guards (`x is Foo`).\n- **Generics** let functions and components work over many types while preserving relationships (`function first<T>(xs: T[]): T | undefined`).\n- Built-in utilities: `Partial`, `Required`, `Readonly`, `Pick`, `Omit`, `Record`, `ReturnType`, `Parameters`, `Awaited`, `NonNullable`.\n- `strict` mode (especially `strictNullChecks`) is what makes TypeScript worthwhile.",
+     "advanced": "- **Conditional types** with `infer`: `type ElementType<T> = T extends (infer U)[] ? U : never`.\n- **Mapped types** and key remapping: `` { [K in keyof T as `get${Capitalize<K & string>}`]: () => T[K] } ``.\n- **Template literal types** for typed routes, event names and CSS units.\n- **Variance**: function parameters are checked bivariantly for methods; `in`/`out` annotations exist on generics.\n- `satisfies` checks a value against a type without widening its inferred type.\n- Declaration merging, module augmentation, and `.d.ts` authoring for untyped libraries.",
+     "examples": "```ts\n// Discriminated union + exhaustive check\ntype Result<T> =\n  | { status: 'loading' }\n  | { status: 'error'; error: string }\n  | { status: 'success'; data: T };\n\nfunction render<T>(r: Result<T>) {\n  switch (r.status) {\n    case 'loading': return 'Loading…';\n    case 'error': return r.error;\n    case 'success': return JSON.stringify(r.data);\n    default: {\n      const _exhaustive: never = r;\n      return _exhaustive;\n    }\n  }\n}\n\n// Implement your own utility types\ntype MyPick<T, K extends keyof T> = { [P in K]: T[P] };\ntype DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };\n```",
+     "useCases": "- Typing API responses and validating them at the boundary (zod, valibot) so the types are true at runtime.\n- Polymorphic React components (`as` prop) and typed `forwardRef`.\n- Typed event emitters, routers and design-system tokens.",
+     "mistakes": "- Assuming types validate runtime data. An API can return anything; parse it.\n- Overusing `as` assertions and `!` non-null assertions to silence errors.\n- Using `any` in generics instead of constraints (`T extends object`).\n- Writing enormous clever types nobody can maintain. Prefer clarity."
+    },
+    "questions": [
+     {
+      "question": "What is the difference between `type` and `interface`?",
+      "answer": "Both describe object shapes and are mostly interchangeable for objects. **Interfaces** support declaration merging and `extends`, and give slightly nicer error messages. **Type aliases** can name *any* type: unions, intersections, tuples, primitives, mapped and conditional types. A common convention: `interface` for public object contracts that may be extended, `type` for everything else.",
+      "followUps": "- What is declaration merging and when is it useful?\n- Can a class implement a type alias?",
+      "difficulty": "beginner"
+     },
+     {
+      "question": "What is the difference between `any`, `unknown` and `never`?",
+      "answer": "- **any** turns off type checking in both directions. Avoid it.\n- **unknown** accepts any value but you must narrow it before using it. Ideal for `catch (e)` and untrusted input.\n- **never** has no values. It is the return type of functions that throw or loop forever, and the type left after exhaustive narrowing, which makes it great for exhaustiveness checks.",
+      "followUps": "- How do you type the error in a `catch` block?\n- Show an exhaustive switch using `never`.",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Implement `ReturnType` and `Awaited` yourself.",
+      "answer": "```ts\ntype MyReturnType<F> = F extends (...args: any[]) => infer R ? R : never;\ntype MyAwaited<T> = T extends PromiseLike<infer U> ? MyAwaited<U> : T;\n```\nExplain `infer` (captures a type from a position in a pattern), that conditional types distribute over unions when the checked type is a naked type parameter, and that `Awaited` recurses to unwrap nested promises.",
+      "followUps": "- What is distributive conditional typing and how do you disable it?\n- Implement `DeepReadonly<T>`.",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Model an API response with a discriminated union",
+     "Implement Pick, Omit, Partial, ReturnType from scratch",
+     "Write a generic, typed `useFetch<T>` hook",
+     "Explain structural typing with an example",
+     "Know when to use `satisfies` vs a type annotation"
+    ],
+    "resources": [
+     {
+      "title": "TypeScript Handbook",
+      "url": "https://www.typescriptlang.org/docs/handbook/intro.html",
+      "kind": "docs"
+     },
+     {
+      "title": "Type Challenges",
+      "url": "https://github.com/type-challenges/type-challenges",
+      "kind": "repo"
+     },
+     {
+      "title": "Total TypeScript tutorials",
+      "url": "https://www.totaltypescript.com/tutorials",
+      "kind": "course"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "React & React Internals",
+    "icon": "⚛️",
+    "summary": "Components, hooks, rendering, reconciliation, Fiber and concurrent features.",
+    "difficulty": "intermediate",
+    "tags": [
+     "react",
+     "core"
+    ],
+    "sections": {
+     "concept": "React is a library for building UIs as a function of state: `UI = f(state)`. You describe what the UI should look like; React figures out the minimal DOM changes. Internally, rendering produces a tree of elements, **reconciliation** diffs it against the previous tree, and the **Fiber** architecture splits that work into interruptible units so React can prioritise urgent updates (typing) over less urgent ones (rendering a big list).",
+     "fundamentals": "- **Render vs commit**: the render phase calls your components (must be pure); the commit phase applies DOM changes and runs effects.\n- A component re-renders when its **state changes**, its **parent re-renders**, or a **context** it consumes changes. Props changing is a consequence of the parent re-rendering.\n- **Keys** give list items stable identity; using an index as key breaks state when items are reordered.\n- **Hooks rules**: call them at the top level, in the same order every render, only from components or custom hooks.\n- `useState` updates are batched and asynchronous; use the updater form `setX(x => x + 1)` when the next value depends on the previous.\n- `useEffect` is for **synchronising with external systems**, not for deriving state.\n- `useRef` holds a mutable value that does not trigger re-renders; also used for DOM refs.",
+     "advanced": "- **Reconciliation heuristics**: different element types tear down the subtree; same type updates props; keys match children across renders. This makes diffing O(n).\n- **Fiber**: each fiber is a unit of work with links to child/sibling/return. Work can pause, resume, and be discarded. Two trees exist: `current` and `workInProgress` (double buffering).\n- **Lanes** model update priority; `startTransition` and `useDeferredValue` mark updates as non-urgent.\n- **Suspense** lets components \"wait\" for data or code; with streaming SSR, the server sends HTML in chunks as boundaries resolve.\n- **React Server Components** run only on the server, ship zero JS, and can be async. Client components are marked with `'use client'`.\n- **React Compiler** auto-memoises components and hooks, reducing the need for manual `useMemo`/`useCallback`.\n- Memoisation: `React.memo`, `useMemo`, `useCallback` only help when referential equality actually prevents work.",
+     "examples": "```jsx\n// Derive, don't sync: avoid useEffect + setState for derived data\nfunction TodoList({ todos, filter }) {\n  const visible = useMemo(\n    () => todos.filter((t) => filter === 'all' || t.status === filter),\n    [todos, filter],\n  );\n  return visible.map((t) => <Todo key={t.id} todo={t} />);\n}\n\n// Correct data fetching effect with cleanup to avoid race conditions\nfunction User({ id }) {\n  const [user, setUser] = useState(null);\n  useEffect(() => {\n    let ignore = false;\n    fetch(`/api/users/${id}`).then((r) => r.json()).then((u) => {\n      if (!ignore) setUser(u);\n    });\n    return () => { ignore = true; };\n  }, [id]);\n  return user ? <h1>{user.name}</h1> : <Spinner />;\n}\n```",
+     "useCases": "- Keeping typing responsive while filtering 10k rows with `useDeferredValue`.\n- Code-splitting heavy routes with `lazy` + `Suspense`.\n- Building a design system of composable, accessible components.",
+     "mistakes": "- Using effects to compute derived state, causing double renders and bugs.\n- Mutating state objects/arrays directly instead of creating new ones.\n- Wrapping everything in `useMemo`/`useCallback` \"for performance\" without measuring.\n- Index keys on dynamic lists.\n- Missing effect dependencies (and silencing the lint rule) leading to stale closures."
+    },
+    "questions": [
+     {
+      "question": "What happens when you call `setState`?",
+      "answer": "React enqueues an update on the component's fiber and schedules a render with a priority (lane). Multiple updates in the same event are **batched** (automatic batching in React 18+ applies to promises and timeouts too). On render, React calls the component, computes the new element tree, reconciles it against the old one, and in the commit phase applies the minimal DOM mutations, then runs layout effects synchronously and passive effects (`useEffect`) after paint. If the new state is `Object.is` equal to the old, React may bail out.",
+      "followUps": "- Why does logging state right after `setState` show the old value?\n- What is the difference between `useEffect` and `useLayoutEffect`?\n- How does `flushSync` change this?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Why are keys important in lists?",
+      "answer": "Keys let the reconciler match children between renders. With stable keys, React moves existing DOM nodes and preserves component state when items are reordered, inserted or removed. With index keys, inserting at the top shifts every index, so React reuses the wrong component instances: inputs keep the wrong text, animations glitch, and more DOM work happens. Keys must be stable, unique among siblings and not random per render.",
+      "followUps": "- When is an index key acceptable?\n- How can you use `key` to intentionally reset a component's state?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain React Fiber and concurrent rendering.",
+      "answer": "Fiber is React's reconciler rewrite (React 16). Each component instance has a fiber node, and rendering walks the fiber tree as a loop of small units of work instead of a recursive call stack. Because work is chunked, React can **yield** to the browser, **pause**, **resume**, **abort** and **prioritise** it. Concurrent features (`startTransition`, `useDeferredValue`, Suspense) build on this: urgent updates interrupt in-progress low-priority renders, and the commit phase stays synchronous so users never see a half-updated UI.",
+      "followUps": "- What are lanes?\n- Why must the render phase be pure?\n- What does StrictMode's double-invocation catch?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "When should you NOT use `useEffect`?",
+      "answer": "When there's no external system to synchronise with:\n- Transforming data for rendering: compute during render (or `useMemo`).\n- Responding to user events: do it in the event handler.\n- Resetting state when a prop changes: use a `key`.\n- Chained state updates: compute next state in one handler.\n- Fetching in effects is OK but a framework or a library (React Query, RSC) handles caching, races and dedupe better.",
+      "followUps": "- How do you notify a parent about a state change without an effect?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain render vs commit phase and when effects run",
+     "Explain reconciliation and why keys matter",
+     "Know when React.memo / useMemo / useCallback actually help",
+     "Build a custom hook (useDebounce, useLocalStorage) with correct deps",
+     "Explain Fiber, lanes and concurrent rendering at a high level",
+     "Explain Server Components vs Client Components"
+    ],
+    "resources": [
+     {
+      "title": "react.dev: Learn React",
+      "url": "https://react.dev/learn",
+      "kind": "docs"
+     },
+     {
+      "title": "You Might Not Need an Effect",
+      "url": "https://react.dev/learn/you-might-not-need-an-effect",
+      "kind": "docs"
+     },
+     {
+      "title": "React Fiber Architecture (acdlite)",
+      "url": "https://github.com/acdlite/react-fiber-architecture",
+      "kind": "repo"
+     }
+    ],
+    "children": [
+     {
+      "title": "React Hooks Deep Dive",
+      "icon": "🪝",
+      "summary": "useState, useEffect, useRef, useMemo, useCallback, useReducer, context and custom hooks.",
+      "difficulty": "intermediate",
+      "tags": [
+       "react",
+       "hooks"
+      ],
+      "sections": {
+       "concept": "Hooks let function components hold state and side effects. React stores hook state in a linked list on the component's fiber, which is why hooks must be called in the same order every render.",
+       "fundamentals": "- `useState` / `useReducer` for local state; reducers shine when transitions are complex.\n- `useEffect(fn, deps)` runs after paint; cleanup runs before the next effect and on unmount.\n- `useLayoutEffect` runs before paint, for measuring layout.\n- `useRef` for mutable values and DOM nodes.\n- `useMemo` / `useCallback` cache values / functions between renders by deps.\n- `useContext` reads the nearest provider; every consumer re-renders when the value changes.\n- `useId`, `useTransition`, `useDeferredValue`, `useSyncExternalStore`, `useOptimistic`, `use`.",
+       "advanced": "- Context performance: split contexts, memoise the value, or use a selector-based store.\n- `useSyncExternalStore` is the correct way to subscribe to external stores (avoids tearing).\n- Stale closures: use functional updates, refs, or include deps.",
+       "examples": "```js\nfunction useDebounce(value, delay = 300) {\n  const [debounced, setDebounced] = useState(value);\n  useEffect(() => {\n    const id = setTimeout(() => setDebounced(value), delay);\n    return () => clearTimeout(id);\n  }, [value, delay]);\n  return debounced;\n}\n\nfunction usePrevious(value) {\n  const ref = useRef();\n  useEffect(() => { ref.current = value; }, [value]);\n  return ref.current;\n}\n```",
+       "useCases": "- `useDebounce` for search inputs, `useLocalStorage` for persisted preferences, `useMediaQuery` for responsive logic.",
+       "mistakes": "- Conditional hook calls.\n- Object/array literals in deps causing effects to run every render.\n- Forgetting cleanup for subscriptions and timers."
+      },
+      "questions": [
+       {
+        "question": "Why can't hooks be called conditionally?",
+        "answer": "React identifies each hook by its call order in the component. State is stored as an ordered list on the fiber; if a hook is skipped on one render, every subsequent hook reads the wrong slot. That's why the rules require top-level, unconditional calls.",
+        "followUps": "- How does `use()` differ from other hooks here?",
+        "difficulty": "intermediate"
+       },
+       {
+        "question": "useMemo vs useCallback vs React.memo?",
+        "answer": "`useMemo(fn, deps)` caches the **result** of `fn`. `useCallback(fn, deps)` caches the **function itself** (equivalent to `useMemo(() => fn, deps)`). `React.memo(Component)` skips re-rendering a component when its props are shallowly equal. They work together: `useCallback` is mostly useful when passing callbacks to a memoised child or using them as effect deps.",
+        "followUps": "- When does memoisation make things slower?\n- How does the React Compiler change this?",
+        "difficulty": "intermediate"
+       }
+      ],
+      "checklist": [
+       "Write useDebounce, usePrevious, useLocalStorage, useOnClickOutside",
+       "Explain stale closures and three ways to fix them",
+       "Know when to use useReducer over useState"
+      ],
+      "resources": [
+       {
+        "title": "react.dev: Hooks reference",
+        "url": "https://react.dev/reference/react/hooks",
+        "kind": "docs"
+       }
+      ],
+      "children": []
+     }
+    ]
+   },
+   {
+    "title": "Next.js",
+    "icon": "▲",
+    "summary": "App Router, Server Components, rendering strategies, caching and data fetching.",
+    "difficulty": "intermediate",
+    "tags": [
+     "nextjs",
+     "react",
+     "ssr"
+    ],
+    "sections": {
+     "concept": "Next.js is a React framework that adds routing, server rendering, data fetching, caching, bundling and deployment conventions. With the **App Router**, components are **Server Components** by default, layouts are nested and persistent, and you choose per route between static, dynamic and streaming rendering.",
+     "fundamentals": "- **File-system routing**: `app/blog/[slug]/page.tsx`, with `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx` conventions.\n- **Server vs Client Components**: server components can be `async`, access databases and secrets, and ship no JS. Add `'use client'` for interactivity and browser APIs.\n- **Rendering strategies**: SSG (build time), SSR (per request), ISR (static + revalidate), CSR, and streaming with Suspense.\n- **Route Handlers** (`route.ts`) for API endpoints; **Server Actions** for mutations called from forms/components.\n- **Middleware / Proxy** runs before a request is handled: auth redirects, rewrites, i18n.\n- Built-ins: `next/image` (responsive, lazy images), `next/font` (self-hosted fonts, no layout shift), `next/link` (prefetching).",
+     "advanced": "- **Caching layers**: request memoisation, data cache, full route cache and the client router cache. Know how `revalidatePath` / `revalidateTag` invalidate them.\n- **Partial Prerendering / Cache Components**: a static shell with dynamic holes streamed in.\n- **Streaming SSR** sends HTML progressively; the client hydrates boundaries as JS arrives (selective hydration).\n- Edge vs Node runtimes: edge has lower latency but a restricted API surface.\n- Avoiding waterfalls: start fetches in parallel, use `Promise.all`, preload patterns.",
+     "examples": "```tsx\n// app/products/[id]/page.tsx (Server Component)\nexport default async function Product({ params }: { params: Promise<{ id: string }> }) {\n  const { id } = await params;\n  const product = await db.product.findUnique({ where: { id } });\n  if (!product) notFound();\n  return (\n    <>\n      <h1>{product.name}</h1>\n      <Suspense fallback={<ReviewsSkeleton />}>\n        <Reviews productId={id} />\n      </Suspense>\n      <AddToCart id={id} /> {/* 'use client' component */}\n    </>\n  );\n}\n```",
+     "useCases": "- Marketing pages statically generated, dashboards rendered dynamically.\n- E-commerce product pages with ISR so prices update without full rebuilds.\n- Auth-protected routes enforced in middleware/proxy.",
+     "mistakes": "- Adding `'use client'` at the top of the tree, turning everything into client JS.\n- Importing server-only code (DB clients, secrets) into client components.\n- Confusing hydration errors: rendering `Date.now()` or `window` values differently on server and client.\n- Not understanding which fetches are cached."
+    },
+    "questions": [
+     {
+      "question": "Explain SSR, SSG, ISR and CSR. When would you use each?",
+      "answer": "- **SSG**: HTML built once at build time. Fastest, cacheable on a CDN. Docs, blogs, marketing.\n- **SSR**: HTML rendered per request. Fresh and personalised, higher TTFB and server cost. Dashboards, personalised feeds.\n- **ISR**: static pages regenerated in the background after a revalidate interval or on demand. Catalogs, content sites.\n- **CSR**: server sends a shell, browser fetches data. Highly interactive apps behind login where SEO doesn't matter.\nModern Next.js mixes these per route and even per component (static shell + streamed dynamic parts).",
+      "followUps": "- What is hydration and what causes hydration mismatches?\n- How does streaming improve TTFB and FCP?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What are React Server Components and how do they differ from SSR?",
+      "answer": "SSR renders *client* components to HTML on the server, then ships all their JS to hydrate. **RSC** are components that only ever run on the server; their output is a serialised tree (the RSC payload) that the client merges into the UI. Their code and dependencies never reach the browser, they can be async and access back-end resources directly. RSC and SSR are complementary: Next.js uses SSR to turn the RSC payload + client components into initial HTML.",
+      "followUps": "- What can and can't you pass from a server component to a client component as props?\n- How do server actions work?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain App Router file conventions (layout, page, loading, error)",
+     "Explain server vs client components and the serialisation boundary",
+     "Explain the Next.js caching layers and how to revalidate",
+     "Build a route handler and a server action with validation",
+     "Debug a hydration mismatch"
+    ],
+    "resources": [
+     {
+      "title": "Next.js Docs",
+      "url": "https://nextjs.org/docs",
+      "kind": "docs"
+     },
+     {
+      "title": "Next.js Learn course",
+      "url": "https://nextjs.org/learn",
+      "kind": "course"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Browser Internals & Web APIs",
+    "icon": "🌐",
+    "summary": "From URL to pixels, the rendering pipeline, storage, workers and the event model.",
+    "difficulty": "intermediate",
+    "tags": [
+     "browser",
+     "web-apis"
+    ],
+    "sections": {
+     "concept": "Knowing how the browser works lets you reason about performance and bugs rather than guessing. The classic question \"what happens when you type a URL and press enter?\" touches DNS, TCP/TLS, HTTP, parsing, the critical rendering path, and the event loop.",
+     "fundamentals": "- **Navigation**: DNS lookup → TCP handshake → TLS → HTTP request → response → parse HTML.\n- **Critical rendering path**: HTML → DOM, CSS → CSSOM, combined into the render tree → layout → paint → composite.\n- CSS is **render-blocking**; synchronous scripts are **parser-blocking**. Use `defer`/`async`/`type=\"module\"`.\n- **Event model**: capture → target → bubble. `event.stopPropagation()`, `preventDefault()`, event delegation.\n- **Storage**: cookies (sent with requests, 4KB), `localStorage` (sync, ~5MB, strings), `sessionStorage` (per tab), IndexedDB (async, large, structured), Cache API.\n- Browser process model: browser process, renderer processes (site isolation), GPU process, network service.",
+     "advanced": "- **Web Workers** run JS off the main thread (no DOM); **Service Workers** are network proxies enabling offline and push; **Shared Workers** across tabs.\n- **Observers**: `IntersectionObserver` (lazy loading, infinite scroll), `ResizeObserver`, `MutationObserver`, `PerformanceObserver`.\n- **Compositing**: `transform` and `opacity` changes can skip layout and paint and run on the compositor thread.\n- **CORS** is enforced by the browser: preflight `OPTIONS` for non-simple requests.\n- **Same-origin policy**, `postMessage` for cross-origin communication.",
+     "examples": "```js\n// Event delegation: one listener for many items\ndocument.querySelector('#list').addEventListener('click', (e) => {\n  const item = e.target.closest('[data-id]');\n  if (item) select(item.dataset.id);\n});\n\n// Lazy-load images with IntersectionObserver\nconst io = new IntersectionObserver((entries) => {\n  for (const e of entries) {\n    if (e.isIntersecting) {\n      e.target.src = e.target.dataset.src;\n      io.unobserve(e.target);\n    }\n  }\n}, { rootMargin: '200px' });\ndocument.querySelectorAll('img[data-src]').forEach((img) => io.observe(img));\n```",
+     "useCases": "- Offloading image processing or CSV parsing to a Web Worker.\n- Offline-capable PWAs with a Service Worker cache.\n- Infinite scrolling with IntersectionObserver instead of scroll listeners.",
+     "mistakes": "- Storing auth tokens in `localStorage` (readable by any XSS).\n- Attaching listeners to thousands of nodes instead of delegating.\n- Thinking `async` scripts preserve execution order (they don't; `defer` does)."
+    },
+    "questions": [
+     {
+      "question": "What happens when you type a URL and press Enter?",
+      "answer": "1. URL parsing, HSTS check, cache lookup (service worker, HTTP cache).\n2. DNS resolution (browser, OS, resolver caches, then recursive lookup).\n3. TCP handshake and TLS negotiation (or QUIC for HTTP/3).\n4. HTTP request; server responds (maybe redirects, compression, caching headers).\n5. HTML parsing builds the DOM; discovered CSS/JS/images fetched (preload scanner).\n6. CSSOM built; render tree, layout, paint, composite.\n7. JS executes, events fire (`DOMContentLoaded`, `load`), page becomes interactive.\nTailor depth to the role: for frontend, go deep on 5–7.",
+      "followUps": "- What is the preload scanner?\n- How do `async` and `defer` differ?\n- What is the difference between DOMContentLoaded and load?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Compare cookies, localStorage, sessionStorage and IndexedDB.",
+      "answer": "- **Cookies**: small (~4KB), sent with every matching request, can be `HttpOnly`, `Secure`, `SameSite`. Best for session identifiers.\n- **localStorage**: ~5MB per origin, synchronous, strings only, persists. Preferences, non-sensitive cache.\n- **sessionStorage**: like localStorage but per tab and cleared when the tab closes.\n- **IndexedDB**: async, large, structured data with indexes and transactions. Offline data.",
+      "followUps": "- Why is synchronous storage a performance concern?\n- How would you sync state across tabs?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain URL to pixels end to end",
+     "Explain event capturing, bubbling and delegation",
+     "Use IntersectionObserver and a Web Worker in a demo",
+     "Explain CORS and preflight requests"
+    ],
+    "resources": [
+     {
+      "title": "How browsers work (web.dev)",
+      "url": "https://web.dev/articles/howbrowserswork",
+      "kind": "article"
+     },
+     {
+      "title": "Inside look at modern web browser",
+      "url": "https://developer.chrome.com/blog/inside-browser-part1",
+      "kind": "article"
+     },
+     {
+      "title": "MDN: Web APIs",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "HTML, CSS & Rendering",
+    "icon": "🖌️",
+    "summary": "Semantic HTML, accessibility, the box model, layout systems, specificity and reflow/repaint.",
+    "difficulty": "beginner",
+    "tags": [
+     "html",
+     "css",
+     "a11y"
+    ],
+    "sections": {
+     "concept": "HTML gives content structure and meaning, CSS controls presentation, and the browser's rendering engine turns both into pixels. Interviews test **semantics and accessibility**, the **box model**, **layout (flexbox, grid, positioning)**, **specificity and the cascade**, and what triggers **layout vs paint vs composite**.",
+     "fundamentals": "- **Semantic HTML**: `header`, `nav`, `main`, `article`, `section`, `button` vs `div`. Semantics give accessibility and SEO for free.\n- **Box model**: content + padding + border + margin. `box-sizing: border-box` includes padding and border in width.\n- **Specificity**: inline > id > class/attribute/pseudo-class > element. `!important` overrides; `:where()` has zero specificity.\n- **Positioning**: `static`, `relative`, `absolute` (relative to nearest positioned ancestor), `fixed`, `sticky`.\n- **Flexbox** for one-dimensional layout, **Grid** for two-dimensional layout.\n- **Stacking contexts**: created by `position` + `z-index`, `opacity < 1`, `transform`, etc. `z-index` only compares within a context.\n- Responsive design: fluid units, media queries, container queries, `clamp()`.",
+     "advanced": "- **Reflow (layout)** is triggered by geometry changes; **repaint** by visual changes; **composite-only** for `transform`/`opacity`.\n- **Layout thrashing**: interleaving DOM reads (`offsetHeight`) and writes forces synchronous layout. Batch reads then writes.\n- **Accessibility**: ARIA roles only when native semantics are missing, focus management, keyboard navigation, colour contrast, `prefers-reduced-motion`.\n- Modern CSS: `:has()`, cascade layers (`@layer`), container queries, logical properties, `content-visibility`.\n- BFC (block formatting context) explains margin collapsing and float containment.",
+     "examples": "```css\n/* Centering: the eternal question */\n.parent { display: grid; place-items: center; }\n\n/* Responsive card grid without media queries */\n.cards {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));\n  gap: 1rem;\n}\n\n/* Animate cheaply: compositor-only properties */\n.toast { transition: transform 200ms ease, opacity 200ms ease; }\n.toast[hidden] { transform: translateY(8px); opacity: 0; }\n\n@media (prefers-reduced-motion: reduce) {\n  * { transition: none !important; animation: none !important; }\n}\n```",
+     "useCases": "- Building accessible modals: focus trap, `aria-modal`, Escape to close, return focus.\n- Responsive dashboards with CSS Grid and container queries.\n- Smooth 60fps animations using transforms.",
+     "mistakes": "- Clickable `div`s without keyboard support or roles. Use `<button>`.\n- Fighting `z-index` without understanding stacking contexts.\n- Animating `top/left/width/height` instead of `transform`.\n- Removing focus outlines without providing an alternative."
+    },
+    "questions": [
+     {
+      "question": "Explain the CSS box model and `box-sizing`.",
+      "answer": "Every element is a box of **content**, **padding**, **border** and **margin**. With the default `box-sizing: content-box`, `width` applies only to the content, so padding and border add to the rendered size. With `border-box`, `width` includes content + padding + border, which makes layouts far easier to reason about. Vertical margins between blocks can collapse.",
+      "followUps": "- When do margins collapse?\n- What is a block formatting context?",
+      "difficulty": "beginner"
+     },
+     {
+      "question": "What is the difference between reflow and repaint? How do you avoid layout thrashing?",
+      "answer": "**Reflow/layout** recalculates geometry (size, position) and can cascade through the tree; **repaint** redraws pixels without geometry changes (colour, shadow). Changing `transform`/`opacity` on a composited layer can skip both. **Layout thrashing** happens when you alternate reads (`getBoundingClientRect`, `offsetTop`) and writes in a loop, forcing synchronous layout each time. Fix by batching reads first, then writes, or using `requestAnimationFrame`.",
+      "followUps": "- What does `will-change` do and when is it harmful?\n- How would you profile this in DevTools?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "How do you make a custom component accessible?",
+      "answer": "Prefer native elements first. If you must build custom, add the correct `role`, keyboard interaction (Tab, Enter, Space, arrows, Escape per the ARIA Authoring Practices), visible focus styles, `aria-*` state (`aria-expanded`, `aria-selected`), labels (`aria-label`/`aria-labelledby`), and manage focus (move focus into dialogs, return it on close). Test with a screen reader and keyboard only.",
+      "followUps": "- What is the first rule of ARIA?\n- How do you announce dynamic changes (live regions)?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Center an element five different ways",
+     "Explain specificity and calculate it for 3 selectors",
+     "Explain stacking contexts and fix a z-index bug",
+     "Build an accessible modal and dropdown",
+     "Explain reflow vs repaint vs composite"
+    ],
+    "resources": [
+     {
+      "title": "MDN: CSS layout",
+      "url": "https://developer.mozilla.org/en-US/docs/Learn/CSS/CSS_layout",
+      "kind": "docs"
+     },
+     {
+      "title": "web.dev: Learn Accessibility",
+      "url": "https://web.dev/learn/accessibility",
+      "kind": "course"
+     },
+     {
+      "title": "ARIA Authoring Practices Guide",
+      "url": "https://www.w3.org/WAI/ARIA/apg/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Frontend Performance",
+    "icon": "🚀",
+    "summary": "Core Web Vitals, loading, rendering and runtime performance, measured not guessed.",
+    "difficulty": "advanced",
+    "tags": [
+     "performance",
+     "web-vitals"
+    ],
+    "sections": {
+     "concept": "Performance is user experience. Measure first with **Core Web Vitals**: **LCP** (loading, < 2.5s), **INP** (responsiveness, < 200ms) and **CLS** (visual stability, < 0.1). Then optimise the right bottleneck: network (bytes and round-trips), main-thread work (JS), or rendering.",
+     "fundamentals": "- **Lab vs field data**: Lighthouse is lab; CrUX / RUM is real users. Optimise for field p75.\n- **Reduce bytes**: compression (Brotli), minification, tree shaking, code splitting, modern image formats (AVIF/WebP), responsive images.\n- **Reduce round-trips**: HTTP/2/3, preconnect, preload critical assets, CDN caching, avoid request chains.\n- **Caching**: `Cache-Control`, immutable hashed assets, `stale-while-revalidate`.\n- **Rendering**: inline critical CSS, defer non-critical JS, avoid render-blocking resources.\n- **Images**: set width/height (prevents CLS), lazy-load below the fold, `fetchpriority=\"high\"` for the LCP image.",
+     "advanced": "- **INP**: break long tasks (> 50ms) with `scheduler.yield()` / `setTimeout`, move work to workers, reduce hydration cost.\n- **Virtualisation** for long lists (render only visible rows).\n- **Bundle analysis**: identify heavy deps, dynamic `import()`, avoid barrel-file bloat.\n- **React**: avoid unnecessary re-renders (state colocation, memoisation, context splitting), use transitions for expensive updates.\n- **Font loading**: `font-display: swap`, subsetting, preloading, size-adjust to reduce CLS.\n- **Islands / partial hydration / RSC** to ship less JS.",
+     "examples": "```html\n<!-- LCP image: prioritise it, don't lazy-load it -->\n<img src=\"/hero.avif\" width=\"1200\" height=\"600\" fetchpriority=\"high\" alt=\"…\" />\n\n<!-- Warm up connections to critical third parties -->\n<link rel=\"preconnect\" href=\"https://cdn.example.com\" crossorigin />\n```\n```js\n// Break up a long task to keep INP low\nasync function processAll(items) {\n  for (let i = 0; i < items.length; i++) {\n    process(items[i]);\n    if (i % 100 === 0) await new Promise((r) => setTimeout(r)); // yield\n  }\n}\n```",
+     "useCases": "- Cutting LCP on a product page by preloading the hero and server-rendering above-the-fold content.\n- Fixing INP on a search page by debouncing and deferring list rendering.\n- Reducing bundle size 40% by lazy-loading a charting library.",
+     "mistakes": "- Optimising without measuring, or only measuring on a fast laptop.\n- Lazy-loading the LCP image.\n- Unsized images and late-loading ads causing CLS.\n- Shipping entire libraries (moment, lodash) for one function."
+    },
+    "questions": [
+     {
+      "question": "What are Core Web Vitals and how do you improve each?",
+      "answer": "- **LCP** (largest contentful paint): improve server response, preload/prioritise the hero, optimise images, remove render-blocking resources, use SSR/SSG.\n- **INP** (interaction to next paint): reduce long tasks, less JS, yield to the main thread, debounce, avoid heavy re-renders and layout thrashing.\n- **CLS** (cumulative layout shift): reserve space for images/embeds/ads, avoid inserting content above existing content, use font metric overrides.\nMention measuring with field data (web-vitals library, CrUX) at p75.",
+      "followUps": "- Why did INP replace FID?\n- How do you find which element is the LCP?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "A page feels slow. Walk me through how you'd diagnose it.",
+      "answer": "1. Reproduce and quantify: which metric, which pages, which devices (field data first).\n2. Network panel: TTFB, waterfall, request chains, large assets, cache headers.\n3. Performance panel: long tasks, scripting vs rendering time, layout thrashing, hydration cost.\n4. Bundle analyser: what's in the JS, what can be split or removed.\n5. React Profiler: components rendering too often or too slowly.\n6. Fix the biggest bottleneck, re-measure, add monitoring/budgets in CI to prevent regressions.",
+      "followUps": "- How would you set up performance budgets?\n- How do you test on low-end devices?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain LCP, INP and CLS with thresholds and fixes",
+     "Profile a page in the DevTools Performance panel",
+     "Analyse a bundle and implement route-level code splitting",
+     "Implement list virtualisation",
+     "Explain HTTP caching headers for hashed assets vs HTML"
+    ],
+    "resources": [
+     {
+      "title": "web.dev: Web Vitals",
+      "url": "https://web.dev/articles/vitals",
+      "kind": "article"
+     },
+     {
+      "title": "web.dev: Learn Performance",
+      "url": "https://web.dev/learn/performance",
+      "kind": "course"
+     },
+     {
+      "title": "Optimize INP",
+      "url": "https://web.dev/articles/optimize-inp",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Web Security",
+    "icon": "🔒",
+    "summary": "XSS, CSRF, CORS, CSP, clickjacking and secure auth storage for frontend engineers.",
+    "difficulty": "intermediate",
+    "tags": [
+     "security",
+     "web"
+    ],
+    "sections": {
+     "concept": "Frontend security is about not letting untrusted data become code, and not letting other sites act on behalf of your users. Know the **OWASP** basics as they apply to the browser: **XSS**, **CSRF**, **clickjacking**, insecure token storage, and the headers that defend against them.",
+     "fundamentals": "- **XSS**: attacker-controlled input executes as script. Types: stored, reflected, DOM-based. Defend with output encoding (frameworks escape by default), avoid `innerHTML`/`dangerouslySetInnerHTML`, sanitise HTML (DOMPurify), and CSP.\n- **CSRF**: a malicious site triggers a state-changing request using the victim's cookies. Defend with `SameSite` cookies, CSRF tokens, checking `Origin`.\n- **CORS** relaxes the same-origin policy for reads; it's not a security feature for your server, it protects users' data from other origins.\n- **Clickjacking**: embedding your page in an invisible iframe. Defend with `frame-ancestors` in CSP or `X-Frame-Options`.\n- **Cookies**: `HttpOnly` (no JS access), `Secure` (HTTPS only), `SameSite=Lax/Strict`.",
+     "advanced": "- **Content Security Policy**: allow-list script sources, use nonces/hashes, `strict-dynamic`, report-only mode for rollout.\n- **Trusted Types** to lock down DOM XSS sinks.\n- **Subresource Integrity** for CDN scripts.\n- **Supply chain**: lockfiles, audit, minimal dependencies, pin versions.\n- **Token storage trade-offs**: HttpOnly cookies vs in-memory access tokens with refresh token rotation.\n- Open redirects, prototype pollution, postMessage origin checks.",
+     "examples": "```js\n// DOM XSS sink: never do this with user input\nel.innerHTML = userInput; // ❌\nel.textContent = userInput; // ✅\n\n// Sanitise when you must render HTML\nimport DOMPurify from 'dompurify';\nel.innerHTML = DOMPurify.sanitize(markdownHtml);\n\n// Validate postMessage origins\nwindow.addEventListener('message', (e) => {\n  if (e.origin !== 'https://trusted.example.com') return;\n  handle(e.data);\n});\n```\n```http\nContent-Security-Policy: default-src 'self'; script-src 'self' 'nonce-r4nd0m'; frame-ancestors 'none'\nSet-Cookie: session=abc; HttpOnly; Secure; SameSite=Lax; Path=/\n```",
+     "useCases": "- Rendering user-generated markdown safely in a comments system.\n- Rolling out a CSP in report-only mode before enforcing it.\n- Choosing session cookies over localStorage tokens for a banking app.",
+     "mistakes": "- Believing React makes XSS impossible (`dangerouslySetInnerHTML`, `href=\"javascript:\"` URLs, SSR injection).\n- Treating CORS as server-side protection.\n- Storing long-lived tokens in localStorage.\n- Using `Access-Control-Allow-Origin: *` with credentials (not allowed anyway) or reflecting any origin."
+    },
+    "questions": [
+     {
+      "question": "What is XSS and how do you prevent it?",
+      "answer": "Cross-site scripting is when untrusted data is interpreted as executable code in a victim's browser, letting attackers steal sessions, act as the user, or deface the page. Prevention is layered: contextual output encoding (frameworks do this by default), avoid dangerous sinks (`innerHTML`, `eval`, `javascript:` URLs), sanitise any HTML you must render, validate input on the server, set a strict CSP, and use HttpOnly cookies so stolen script can't read session tokens.",
+      "followUps": "- Explain stored vs reflected vs DOM XSS.\n- How does a nonce-based CSP work?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain CSRF and how SameSite cookies help.",
+      "answer": "CSRF tricks a logged-in user's browser into sending a state-changing request to your site from another origin; the browser attaches cookies automatically. `SameSite=Lax` (the default in modern browsers) stops cookies being sent on cross-site subrequests and non-GET top-level navigations; `Strict` stops them on all cross-site requests. Combine with CSRF tokens for older browsers and sensitive actions, and never perform mutations on GET.",
+      "followUps": "- Why doesn't CORS prevent CSRF?\n- Is a JSON API with token auth in headers vulnerable to CSRF?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain XSS types and four layers of defence",
+     "Explain CSRF and SameSite values",
+     "Write a strict CSP for a React app",
+     "Compare cookie vs localStorage token storage",
+     "Explain CORS preflight and credentials"
+    ],
+    "resources": [
+     {
+      "title": "OWASP Top Ten",
+      "url": "https://owasp.org/www-project-top-ten/",
+      "kind": "docs"
+     },
+     {
+      "title": "OWASP XSS Prevention Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+      "kind": "docs"
+     },
+     {
+      "title": "MDN: Content Security Policy",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Frontend System Design",
+    "icon": "🏗️",
+    "summary": "Designing UIs at scale: requirements, component architecture, data, state, performance and a11y.",
+    "difficulty": "advanced",
+    "tags": [
+     "system-design",
+     "architecture"
+    ],
+    "sections": {
+     "concept": "Frontend system design interviews ask you to design a product UI (news feed, autocomplete, chat, Google Docs, image carousel) end to end. Interviewers assess how you **clarify requirements**, decompose into **components**, design the **data model and API contract**, manage **state**, and address **performance, accessibility, offline and i18n**.",
+     "fundamentals": "A reliable framework (**RADIO**):\n- **R**equirements: functional (what it does) and non-functional (devices, scale, performance, a11y, offline).\n- **A**rchitecture: high-level components (view, controller/store, server cache, client store) and how they talk.\n- **D**ata model: entities, client state vs server state, normalisation.\n- **I**nterface (API): endpoints, pagination (cursor vs offset), real-time (polling, SSE, WebSockets), request/response shapes.\n- **O**ptimisations: performance, network, rendering, a11y, security, i18n, error handling.",
+     "advanced": "- **Pagination**: cursor-based for feeds (stable under inserts), offset for tables with page numbers.\n- **Real-time**: long polling vs SSE (server → client) vs WebSockets (bidirectional).\n- **Optimistic updates** with rollback on error.\n- **Normalised cache** (entities by id) to keep data consistent across views.\n- **Offline**: service worker caching, IndexedDB queue of pending mutations, conflict resolution.\n- **Collaborative editing**: OT vs CRDTs.\n- **Rendering**: virtualisation, skeletons, image placeholders, prefetching next page.",
+     "examples": "```text\nDesign: Autocomplete / typeahead\n- Requirements: results as you type, keyboard nav, highlights, works on mobile, a11y (combobox)\n- Components: Input, ResultsList, ResultItem, controller (debounce, cache, request mgmt)\n- Data: cache Map<query, results>, LRU with TTL; normalise result entities\n- API: GET /search?q=&limit=10; return within 100ms p95\n- Optimisations:\n  * debounce 150–300ms, min query length\n  * cancel stale requests (AbortController) or ignore out-of-order responses\n  * cache prefixes; serve from cache instantly\n  * ARIA combobox: aria-expanded, aria-activedescendant, role=listbox/option\n  * virtualise long lists, highlight matches safely (no innerHTML)\n```",
+     "useCases": "- News feed (infinite scroll, cursor pagination, optimistic likes).\n- Chat app (WebSockets, message ordering, delivery states, offline queue).\n- Design-system architecture for multiple product teams.",
+     "mistakes": "- Jumping into components before clarifying requirements.\n- Ignoring accessibility, error and loading states.\n- Over-engineering (micro-frontends for a 3-person team).\n- Not discussing trade-offs explicitly."
+    },
+    "questions": [
+     {
+      "question": "Design a news feed like Facebook or Twitter.",
+      "answer": "Clarify: post types, infinite scroll, real-time new posts, likes/comments, devices. Architecture: Feed → FeedItem → (Media, Actions, Comments), a server-state cache (React Query) with normalised posts, client store for UI state. API: `GET /feed?cursor=…&limit=20` returning `{items, nextCursor}`; cursor pagination avoids duplicates when new posts arrive; SSE or polling for \"new posts\" banner rather than inserting above the fold. Optimisations: virtualised list, IntersectionObserver to fetch the next page, image lazy-loading with fixed aspect ratios (no CLS), optimistic like/unlike with rollback, prefetch next page, skeletons, keyboard navigation, `aria-live` for new-post announcements, sanitise rich text.",
+      "followUps": "- How do you handle a post being edited or deleted while visible?\n- How would you support offline reading?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Design an autocomplete component used across the company.",
+      "answer": "Cover the API surface (props: `fetchSuggestions`, `renderItem`, `debounceMs`, `minChars`, controlled vs uncontrolled), behaviour (debounce, caching, race conditions, keyboard navigation, highlighting), accessibility (ARIA combobox pattern), performance (virtualisation, memoisation), theming, i18n/RTL, testing strategy, and versioning in a design system.",
+      "followUps": "- Server-side vs client-side filtering trade-offs?\n- How do you handle a slow API?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Practice the RADIO framework on 5 classic problems",
+     "Explain cursor vs offset pagination",
+     "Compare polling, SSE and WebSockets",
+     "Explain optimistic updates and rollback",
+     "Design an accessible autocomplete end to end"
+    ],
+    "resources": [
+     {
+      "title": "GreatFrontEnd: Front End System Design",
+      "url": "https://www.greatfrontend.com/front-end-system-design-playbook",
+      "kind": "course"
+     },
+     {
+      "title": "Patterns.dev",
+      "url": "https://www.patterns.dev/",
+      "kind": "book"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Micro-frontends",
+    "icon": "🧩",
+    "summary": "Splitting a frontend across teams: composition strategies, Module Federation and trade-offs.",
+    "difficulty": "advanced",
+    "tags": [
+     "architecture",
+     "micro-frontends"
+    ],
+    "sections": {
+     "concept": "Micro-frontends apply microservice ideas to the UI: independent teams own vertical slices of a product and deploy them independently. They solve **organisational scaling** problems, not technical ones, and add real complexity, so a strong answer always discusses when *not* to use them.",
+     "fundamentals": "- **Composition**: build-time (npm packages), server-side (SSI/ESI, edge composition), run-time (Module Federation, import maps, iframes, Web Components).\n- **Shell / host app** handles routing, auth, layout; **remotes** expose features.\n- **Shared dependencies** (React, design system) loaded once with version negotiation.\n- **Communication**: URL, custom events, a minimal shared event bus; avoid shared global state.\n- **Independent deployment** requires backward-compatible contracts.",
+     "advanced": "- **Module Federation** (webpack/rspack/Vite plugins): runtime loading of remote modules with shared singletons.\n- **Style isolation**: CSS modules, prefixes, Shadow DOM.\n- **Performance risks**: duplicate frameworks, waterfalls loading remotes, larger total JS.\n- **Consistency**: a shared design system, linting and contract tests.\n- **Monorepo** with good boundaries (Nx, Turborepo) is often the better alternative.",
+     "examples": "```js\n// webpack Module Federation (host)\nnew ModuleFederationPlugin({\n  name: 'shell',\n  remotes: { checkout: 'checkout@https://cdn.example.com/checkout/remoteEntry.js' },\n  shared: { react: { singleton: true, requiredVersion: '^19.0.0' } },\n});\n\n// Lazy-load a remote component\nconst Checkout = React.lazy(() => import('checkout/App'));\n```",
+     "useCases": "- Large e-commerce platforms where search, product, cart and account are owned by different teams.\n- Gradual migration of a legacy AngularJS app to React route by route (strangler pattern).",
+     "mistakes": "- Adopting micro-frontends for a small team (all cost, no benefit).\n- Sharing global state between micro-frontends, recoupling them.\n- Letting each team pick different frameworks and versions without governance."
+    },
+    "questions": [
+     {
+      "question": "When would you choose micro-frontends, and what are the trade-offs?",
+      "answer": "Choose them when many teams need to ship a single product independently, release cadences conflict, or you're incrementally migrating a legacy app. Benefits: team autonomy, independent deploys, isolated failures, incremental upgrades. Costs: operational complexity, duplicated dependencies and larger bundles, UX inconsistency, harder testing and debugging, cross-app communication and versioning. Alternatives: a well-structured monorepo with clear ownership and module boundaries.",
+      "followUps": "- How do you share a design system across micro-frontends?\n- How do micro-frontends communicate?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain 4 composition strategies with trade-offs",
+     "Explain Module Federation shared singletons",
+     "Argue for and against micro-frontends for a given org"
+    ],
+    "resources": [
+     {
+      "title": "Martin Fowler: Micro Frontends",
+      "url": "https://martinfowler.com/articles/micro-frontends.html",
+      "kind": "article"
+     },
+     {
+      "title": "Module Federation docs",
+      "url": "https://module-federation.io/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Testing & Debugging",
+    "icon": "🧪",
+    "summary": "Testing pyramid/trophy, unit, integration and E2E tests, mocking, and debugging techniques.",
+    "difficulty": "intermediate",
+    "tags": [
+     "testing",
+     "debugging"
+    ],
+    "sections": {
+     "concept": "Good tests give confidence to change code. For frontends the **testing trophy** suggests mostly **integration tests** that render components and interact like a user, a base of static analysis (TypeScript, ESLint), some unit tests for pure logic, and a few critical end-to-end tests.",
+     "fundamentals": "- **Static**: TypeScript, ESLint catch whole classes of bugs for free.\n- **Unit**: pure functions, hooks, reducers (Vitest/Jest).\n- **Integration**: render components with React Testing Library; query by role/label, assert on what the user sees.\n- **E2E**: Playwright/Cypress for critical flows (login, checkout).\n- **Mocking**: mock at the network boundary (MSW) rather than mocking your own modules.\n- Test behaviour, not implementation details.",
+     "advanced": "- **Visual regression** (Chromatic, Playwright screenshots).\n- **Accessibility testing** with axe in unit and E2E tests.\n- **Flaky tests**: avoid arbitrary sleeps, use auto-waiting and deterministic data.\n- **Contract testing** between frontend and API.\n- **Debugging**: breakpoints, conditional breakpoints, logpoints, the Performance and Memory panels, React DevTools Profiler, source maps in production.",
+     "examples": "```tsx\nimport { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\n\ntest('adds a todo', async () => {\n  render(<TodoApp />);\n  await userEvent.type(screen.getByRole('textbox', { name: /new todo/i }), 'Learn RTL');\n  await userEvent.click(screen.getByRole('button', { name: /add/i }));\n  expect(screen.getByRole('listitem')).toHaveTextContent('Learn RTL');\n});\n```",
+     "useCases": "- Preventing regressions in a checkout flow with a Playwright test in CI.\n- Using MSW to develop and test UI before the backend is ready.",
+     "mistakes": "- Testing internal state or snapshot-testing everything.\n- Querying by test ids or class names when roles and labels exist.\n- Mocking too much so tests pass while the app is broken."
+    },
+    "questions": [
+     {
+      "question": "What should you test in a React component, and how?",
+      "answer": "Test what users experience: rendered output, interactions and resulting changes, accessibility, loading/error/empty states. Use React Testing Library to render, query by role/label/text, simulate real interactions with user-event, and assert visible outcomes. Mock the network (MSW), not child components. Keep pure logic in functions with unit tests.",
+      "followUps": "- Why prefer `getByRole` over `getByTestId`?\n- How do you test a custom hook?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "How do you debug a memory leak in a web app?",
+      "answer": "Reproduce the suspected flow repeatedly, take heap snapshots in the Memory panel before and after, and compare to find objects growing (detached DOM nodes, listeners, closures). Use the allocation timeline to find what allocates. Common causes: listeners/subscriptions/timers not cleaned up in effects, global caches, closures holding large objects, detached nodes referenced from JS.",
+      "followUps": "- What is a detached DOM node?\n- How does WeakMap help?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Write integration tests with React Testing Library",
+     "Mock APIs with MSW",
+     "Write a Playwright test for a critical flow",
+     "Find a memory leak with heap snapshots",
+     "Profile renders with React DevTools"
+    ],
+    "resources": [
+     {
+      "title": "Testing Library docs",
+      "url": "https://testing-library.com/docs/",
+      "kind": "docs"
+     },
+     {
+      "title": "Kent C. Dodds: The Testing Trophy",
+      "url": "https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications",
+      "kind": "article"
+     },
+     {
+      "title": "Playwright docs",
+      "url": "https://playwright.dev/docs/intro",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   }
+  ]
+ },
+ {
+  "name": "Full Stack Engineering",
+  "icon": "🛠️",
+  "description": "Node.js, APIs, databases, auth, caching, queues, system design and deployment.",
+  "topics": [
+   {
+    "title": "Node.js & Backend Fundamentals",
+    "icon": "🟩",
+    "summary": "The Node event loop, streams, modules, error handling and what makes Node fast (and slow).",
+    "difficulty": "beginner",
+    "tags": [
+     "nodejs",
+     "backend",
+     "core"
+    ],
+    "sections": {
+     "concept": "Node.js is a JavaScript runtime built on V8 and **libuv**. It uses a single-threaded event loop with non-blocking I/O, so one process can handle thousands of concurrent connections as long as no single piece of work blocks the loop. CPU-heavy work needs worker threads, child processes or a different service.",
+     "fundamentals": "- **Event loop phases**: timers → pending callbacks → poll (I/O) → check (`setImmediate`) → close callbacks. `process.nextTick` and promise microtasks run between phases.\n- **libuv thread pool** (default 4) handles fs, DNS lookup, crypto and zlib.\n- **Modules**: CommonJS (`require`, sync) vs ES Modules (`import`, async, static analysis). Set `\"type\": \"module\"` to use ESM.\n- **Streams**: Readable, Writable, Duplex, Transform; `pipeline()` handles errors and backpressure.\n- **Buffers** hold binary data outside the V8 heap.\n- **Errors**: operational (expected, e.g. network) vs programmer errors (bugs). Handle `unhandledRejection` and crash fast on unknown state.\n- Environment config via env vars, never commit secrets.",
+     "advanced": "- **Backpressure**: when a writable can't keep up, `write()` returns false; pause the readable until `drain`.\n- **Worker threads** for CPU-bound tasks; **cluster** / multiple processes behind a load balancer to use all cores.\n- **Graceful shutdown**: stop accepting connections on SIGTERM, finish in-flight requests, close DB pools.\n- **Profiling**: `--inspect`, flame graphs (clinic.js, 0x), heap snapshots for leaks.\n- **Event loop lag** monitoring as a health signal.\n- `AsyncLocalStorage` for request-scoped context (request ids in logs).",
+     "examples": "```js\nimport { createReadStream, createWriteStream } from 'node:fs';\nimport { createGzip } from 'node:zlib';\nimport { pipeline } from 'node:stream/promises';\n\n// Compress a huge file with constant memory and proper error handling\nawait pipeline(\n  createReadStream('access.log'),\n  createGzip(),\n  createWriteStream('access.log.gz'),\n);\n\n// Graceful shutdown\nprocess.on('SIGTERM', () => {\n  server.close(async () => {\n    await db.end();\n    process.exit(0);\n  });\n});\n```",
+     "useCases": "- Real-time APIs (chat, notifications) with many idle connections.\n- BFF (backend-for-frontend) layers aggregating microservices.\n- Streaming large CSV exports without loading them into memory.",
+     "mistakes": "- Blocking the event loop with sync fs/crypto calls or heavy JSON parsing in request handlers.\n- Not handling promise rejections, leading to crashes or silent failures.\n- Reading whole files into memory instead of streaming.\n- Assuming Node is multi-threaded for your JS code."
+    },
+    "questions": [
+     {
+      "question": "Explain the Node.js event loop phases.",
+      "answer": "libuv runs the loop in phases: **timers** (expired `setTimeout`/`setInterval`), **pending callbacks** (some deferred system errors), **idle/prepare** (internal), **poll** (retrieve new I/O events and run their callbacks; may block waiting), **check** (`setImmediate` callbacks), **close callbacks** (`socket.on('close')`). Between each callback, Node drains the `process.nextTick` queue and then the promise microtask queue. That's why `nextTick` fires before promises, and `setImmediate` fires before timers when scheduled from an I/O callback.",
+      "followUps": "- `setImmediate` vs `setTimeout(fn, 0)`: which runs first?\n- What runs on the libuv thread pool?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "How do you handle CPU-intensive work in Node?",
+      "answer": "Don't run it on the main event loop. Options: **worker threads** (shared memory possible, good for parsing/image processing), **child processes**, offload to a **job queue** processed by separate workers (BullMQ), or move it to a service in a better-suited language. Also chunk work and yield with `setImmediate` if it must stay in-process.",
+      "followUps": "- How do you measure event loop lag?\n- When would you use cluster vs worker threads?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What are streams and why use them?",
+      "answer": "Streams process data piece by piece instead of buffering it all in memory, enabling constant memory usage and lower latency for large or infinite data (files, HTTP bodies, sockets). They compose via `pipeline`, and handle **backpressure** so fast producers don't overwhelm slow consumers.",
+      "followUps": "- What is backpressure and how does Node handle it?\n- Why prefer `pipeline` over `.pipe()`?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain event loop phases, nextTick and microtasks",
+     "Use streams with pipeline for a large file",
+     "Implement graceful shutdown",
+     "Explain CommonJS vs ESM differences",
+     "Offload CPU work to a worker thread"
+    ],
+    "resources": [
+     {
+      "title": "Node.js: The event loop",
+      "url": "https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick",
+      "kind": "docs"
+     },
+     {
+      "title": "Node.js Best Practices",
+      "url": "https://github.com/goldbergyoni/nodebestpractices",
+      "kind": "repo"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Express.js & NestJS",
+    "icon": "🚂",
+    "summary": "Middleware, routing, error handling, validation, and NestJS modules, DI and providers.",
+    "difficulty": "intermediate",
+    "tags": [
+     "express",
+     "nestjs",
+     "backend"
+    ],
+    "sections": {
+     "concept": "**Express** is a minimal HTTP framework built around a middleware pipeline. **NestJS** is an opinionated framework (often on top of Express or Fastify) that adds modules, dependency injection, decorators, guards, pipes and interceptors for large, structured codebases.",
+     "fundamentals": "- Express middleware signature `(req, res, next)`; order matters. Error middleware has four args `(err, req, res, next)`.\n- Routers for modular route groups; `express.json()` for body parsing.\n- Validation at the edge (zod/Joi/class-validator) and consistent error responses.\n- NestJS building blocks: **Modules**, **Controllers**, **Providers/Services**, **DI container**.\n- Nest request lifecycle: middleware → guards → interceptors (before) → pipes → handler → interceptors (after) → exception filters.",
+     "advanced": "- Async error handling in Express 4 requires wrappers (Express 5 handles rejected promises).\n- Security middleware: helmet, rate limiting, CORS config, body size limits.\n- Structured logging with request ids (pino), metrics, tracing (OpenTelemetry).\n- NestJS: custom decorators, dynamic modules, scopes (singleton/request/transient), testing with `Test.createTestingModule`.\n- Fastify for higher throughput and schema-based serialisation.",
+     "examples": "```js\nconst app = express();\napp.use(helmet());\napp.use(express.json({ limit: '100kb' }));\n\nconst CreateUser = z.object({ email: z.string().email(), name: z.string().min(1) });\n\napp.post('/users', async (req, res, next) => {\n  try {\n    const input = CreateUser.parse(req.body);\n    const user = await users.create(input);\n    res.status(201).json(user);\n  } catch (err) {\n    next(err);\n  }\n});\n\n// Centralised error handler\napp.use((err, req, res, _next) => {\n  if (err instanceof z.ZodError) return res.status(400).json({ error: err.flatten() });\n  req.log?.error(err);\n  res.status(500).json({ error: 'Internal Server Error' });\n});\n```",
+     "useCases": "- Express for small services, prototypes and BFFs.\n- NestJS for large teams wanting consistent architecture and testability.",
+     "mistakes": "- Forgetting `next(err)` in async handlers, causing hung requests.\n- Business logic inside route handlers instead of services.\n- Leaking stack traces in production error responses."
+    },
+    "questions": [
+     {
+      "question": "How does middleware work in Express?",
+      "answer": "Express keeps an ordered stack of middleware. Each request flows through matching middleware in registration order; each can read/modify `req`/`res`, end the response, or call `next()` to pass control on. Calling `next(err)` skips to error-handling middleware (4 arguments). This composition model is how auth, logging, parsing and error handling are layered.",
+      "followUps": "- How would you write an auth middleware?\n- How do you handle async errors in Express 4 vs 5?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain dependency injection in NestJS and why it helps.",
+      "answer": "Classes declare dependencies in their constructor; Nest's IoC container creates and injects instances based on module providers. Benefits: loose coupling, easy swapping of implementations (e.g. a mock repository in tests), centralised lifecycle management (singletons by default), and clear module boundaries.",
+      "followUps": "- What are guards vs interceptors vs pipes?\n- What are provider scopes?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Build an Express API with validation and centralised error handling",
+     "Explain Nest request lifecycle",
+     "Add helmet, CORS and rate limiting",
+     "Write tests for a Nest service with mocked providers"
+    ],
+    "resources": [
+     {
+      "title": "Express docs",
+      "url": "https://expressjs.com/",
+      "kind": "docs"
+     },
+     {
+      "title": "NestJS docs",
+      "url": "https://docs.nestjs.com/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "REST APIs & GraphQL",
+    "icon": "🔌",
+    "summary": "Resource design, status codes, idempotency, pagination, versioning, and GraphQL trade-offs.",
+    "difficulty": "intermediate",
+    "tags": [
+     "api",
+     "rest",
+     "graphql"
+    ],
+    "sections": {
+     "concept": "APIs are contracts. **REST** models resources with URLs and uses HTTP semantics (methods, status codes, caching). **GraphQL** exposes a typed schema and lets clients request exactly the fields they need in one round-trip. Interviewers want good resource design and a clear view of trade-offs.",
+     "fundamentals": "- Methods: `GET` (safe, idempotent), `PUT` (idempotent replace), `PATCH` (partial), `POST` (create/non-idempotent), `DELETE` (idempotent).\n- Status codes: 200, 201, 204, 400, 401 (unauthenticated), 403 (forbidden), 404, 409 (conflict), 422, 429, 500, 503.\n- Nouns not verbs: `GET /users/42/orders`.\n- **Pagination**: offset/limit (simple, unstable with inserts) vs cursor/keyset (stable, scalable).\n- **Versioning**: URL (`/v1`), header, or additive evolution.\n- **Idempotency keys** for safe retries of POST (payments).\n- GraphQL basics: schema, queries, mutations, subscriptions, resolvers.",
+     "advanced": "- **N+1 problem** in GraphQL resolvers solved by DataLoader batching.\n- GraphQL caching is harder (single endpoint, POST): use persisted queries, normalised client caches.\n- Query cost analysis / depth limits to prevent abusive GraphQL queries.\n- **HATEOAS**, ETags and conditional requests (`If-None-Match`, `If-Match` for optimistic concurrency).\n- gRPC for internal service-to-service communication.\n- OpenAPI for contracts, codegen and docs.",
+     "examples": "```http\nPOST /payments\nIdempotency-Key: 6c1b9f0e-…\nContent-Type: application/json\n\n{ \"amount\": 4999, \"currency\": \"USD\" }\n\nHTTP/1.1 201 Created\nLocation: /payments/pay_123\n```\n```graphql\ntype Query {\n  user(id: ID!): User\n}\ntype User {\n  id: ID!\n  name: String!\n  posts(first: Int = 10, after: String): PostConnection!\n}\n```",
+     "useCases": "- REST for public APIs that benefit from HTTP caching.\n- GraphQL as a BFF aggregating many services for multiple clients (web, mobile).",
+     "mistakes": "- Returning 200 with an error body.\n- Using offset pagination on huge, frequently-changing tables.\n- Exposing database structure directly as the API.\n- Ignoring N+1 queries in GraphQL resolvers."
+    },
+    "questions": [
+     {
+      "question": "REST vs GraphQL: when would you choose each?",
+      "answer": "**REST**: simple, cacheable via HTTP/CDNs, great tooling, works well for resource-oriented and public APIs. **GraphQL**: clients fetch exactly what they need in one request, strongly typed schema, great for complex UIs aggregating many resources and for multiple clients with different needs. Costs: caching complexity, N+1 risks, query cost control, more server complexity. Choose based on clients, team, and caching needs.",
+      "followUps": "- How do you solve N+1 in GraphQL?\n- How do you version a GraphQL API?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What is idempotency and why does it matter?",
+      "answer": "An operation is idempotent if repeating it has the same effect as doing it once. Networks fail, clients retry, so non-idempotent operations (POST payment) can double-charge. Use idempotency keys: the server stores the key with the result and returns the stored result for repeats.",
+      "followUps": "- Is PATCH idempotent?\n- Where would you store idempotency keys and for how long?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Offset vs cursor pagination?",
+      "answer": "Offset (`LIMIT 20 OFFSET 1000`) is simple and supports jumping to page N, but gets slower with large offsets (DB scans and discards rows) and shows duplicates/misses when data changes. Cursor/keyset pagination (`WHERE created_at < :cursor ORDER BY created_at DESC LIMIT 20`) uses an index, is consistently fast, and stable under inserts, but can't jump to arbitrary pages.",
+      "followUps": "- How do you build a cursor when the sort key isn't unique?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Design a REST API for a blog with correct status codes",
+     "Implement cursor pagination",
+     "Explain idempotency keys",
+     "Build a GraphQL schema and fix N+1 with DataLoader",
+     "Write an OpenAPI spec for 3 endpoints"
+    ],
+    "resources": [
+     {
+      "title": "Microsoft REST API Guidelines",
+      "url": "https://github.com/microsoft/api-guidelines",
+      "kind": "repo"
+     },
+     {
+      "title": "GraphQL Learn",
+      "url": "https://graphql.org/learn/",
+      "kind": "docs"
+     },
+     {
+      "title": "MDN: HTTP response status codes",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Databases: SQL & NoSQL",
+    "icon": "🗄️",
+    "summary": "Relational vs document/key-value/wide-column stores, ACID, isolation levels and CAP.",
+    "difficulty": "intermediate",
+    "tags": [
+     "databases",
+     "sql",
+     "nosql"
+    ],
+    "sections": {
+     "concept": "Choosing a database is choosing trade-offs between **consistency, flexibility, query power and scale**. Relational databases (PostgreSQL, MySQL) give strong consistency, joins and transactions. NoSQL stores (MongoDB, DynamoDB, Cassandra, Redis) trade some of that for flexible schemas, specific access patterns and horizontal scale.",
+     "fundamentals": "- **ACID**: Atomicity, Consistency, Isolation, Durability.\n- **Isolation levels**: Read Uncommitted, Read Committed, Repeatable Read, Serializable; anomalies: dirty reads, non-repeatable reads, phantoms, lost updates, write skew.\n- **SQL**: joins (inner, left, right, full), `GROUP BY`/`HAVING`, window functions, subqueries, CTEs.\n- **NoSQL families**: document (MongoDB), key-value (Redis, DynamoDB), wide-column (Cassandra), graph (Neo4j).\n- **CAP**: during a network partition choose consistency or availability. **PACELC** adds latency vs consistency otherwise.\n- **BASE** for eventually consistent systems.",
+     "advanced": "- **MVCC** (Postgres) lets readers not block writers.\n- **Replication**: leader-follower (read replicas, replication lag), multi-leader, leaderless (quorums).\n- **Sharding/partitioning**: by hash or range; hot partitions; resharding.\n- **DynamoDB single-table design** around access patterns.\n- **Optimistic vs pessimistic locking** (`SELECT … FOR UPDATE`, version columns).\n- Distributed transactions: 2PC vs sagas.",
+     "examples": "```sql\n-- Top 3 most recent orders per customer (window function)\nSELECT * FROM (\n  SELECT o.*, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC) AS rn\n  FROM orders o\n) t\nWHERE rn <= 3;\n\n-- Avoid lost updates with optimistic locking\nUPDATE accounts SET balance = balance - 100, version = version + 1\nWHERE id = 42 AND version = 7;  -- 0 rows updated => someone else changed it\n```",
+     "useCases": "- Postgres for transactional data (orders, payments, users).\n- DynamoDB/Cassandra for massive write throughput with known access patterns.\n- MongoDB for content with varied, evolving shapes.",
+     "mistakes": "- Picking NoSQL \"for scale\" when data is relational and scale is modest.\n- Ignoring isolation anomalies in money-moving code.\n- Reading from replicas right after a write (read-your-writes violations)."
+    },
+    "questions": [
+     {
+      "question": "SQL vs NoSQL: how do you choose?",
+      "answer": "Start from data shape and access patterns. Relational fits structured, related data that needs joins, ad-hoc queries and strong transactional guarantees. NoSQL fits known access patterns at very high scale, flexible or hierarchical documents, very high write throughput, or specialised needs (caching, graphs). Consider team expertise and operational burden. Postgres is a great default; it even handles JSON documents well.",
+      "followUps": "- What are the trade-offs of denormalisation?\n- How does MongoDB handle transactions?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain transaction isolation levels and the anomalies each prevents.",
+      "answer": "- **Read Uncommitted**: allows dirty reads.\n- **Read Committed** (Postgres default): no dirty reads; non-repeatable reads and phantoms possible.\n- **Repeatable Read**: same row reads are stable; in Postgres (snapshot isolation) phantoms are prevented too, but write skew is possible.\n- **Serializable**: equivalent to some serial order; prevents all anomalies, with higher abort/retry rates.\nGive a write-skew example: two doctors both going off call because each saw another doctor on call.",
+      "followUps": "- What is MVCC?\n- How do you prevent lost updates?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Explain the CAP theorem.",
+      "answer": "In a distributed system experiencing a network **partition**, you must choose between **consistency** (every read sees the latest write or errors) and **availability** (every request gets a non-error response, possibly stale). Without partitions you can have both; PACELC says then you trade latency vs consistency. Examples: CP systems like ZooKeeper/etcd, AP systems like Cassandra/DynamoDB (tunable).",
+      "followUps": "- Is Postgres CP or AP?\n- What is eventual consistency and how do you design UIs around it?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Write joins, aggregations and window functions fluently",
+     "Explain ACID and isolation anomalies with examples",
+     "Explain CAP/PACELC with real systems",
+     "Explain replication lag and read-your-writes",
+     "Compare document, key-value, wide-column stores"
+    ],
+    "resources": [
+     {
+      "title": "Designing Data-Intensive Applications",
+      "url": "https://dataintensive.net/",
+      "kind": "book"
+     },
+     {
+      "title": "PostgreSQL Docs: Transaction Isolation",
+      "url": "https://www.postgresql.org/docs/current/transaction-iso.html",
+      "kind": "docs"
+     },
+     {
+      "title": "SQLBolt interactive lessons",
+      "url": "https://sqlbolt.com/",
+      "kind": "course"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Database Design & Optimization",
+    "icon": "📐",
+    "summary": "Normalisation, indexing, query plans, N+1, connection pooling and schema evolution.",
+    "difficulty": "advanced",
+    "tags": [
+     "databases",
+     "performance",
+     "indexing"
+    ],
+    "sections": {
+     "concept": "Good schemas make correct queries easy and fast. Optimisation means reading **query plans**, adding the right **indexes**, fixing **access patterns** (N+1, over-fetching), and scaling with replicas, caching and partitioning only when needed.",
+     "fundamentals": "- **Normalisation** (1NF–3NF) removes redundancy; **denormalise** deliberately for read performance.\n- **Keys**: natural vs surrogate, UUID vs bigserial trade-offs (index locality; UUIDv7 is time-ordered).\n- **B-tree indexes** speed up equality and range lookups; composite index column order matters (leftmost prefix).\n- `EXPLAIN ANALYZE` shows seq scans, index scans, join strategies and row estimates.\n- **N+1 queries** from ORMs: use joins/eager loading or batching.\n- **Connection pooling** (PgBouncer) since DB connections are expensive.",
+     "advanced": "- Covering indexes (`INCLUDE`), partial indexes, expression indexes, GIN for JSONB/full-text.\n- Index costs: slower writes, more storage; unused indexes should be dropped.\n- **Zero-downtime migrations**: expand/contract, backfill in batches, create indexes concurrently.\n- Partitioning large tables by time; archiving.\n- Materialised views for expensive aggregates.\n- Lock contention and long-running transactions.",
+     "examples": "```sql\n-- Composite index matches WHERE + ORDER BY\nCREATE INDEX CONCURRENTLY idx_orders_customer_created\n  ON orders (customer_id, created_at DESC);\n\nEXPLAIN ANALYZE\nSELECT id, total FROM orders\nWHERE customer_id = 42\nORDER BY created_at DESC\nLIMIT 20;\n\n-- Partial index for a hot subset\nCREATE INDEX idx_jobs_pending ON jobs (run_at) WHERE status = 'pending';\n```",
+     "useCases": "- Speeding up a slow dashboard query from seconds to milliseconds with a composite index.\n- Renaming a column with zero downtime via expand/contract.",
+     "mistakes": "- Indexing every column.\n- Functions on indexed columns in `WHERE` (`WHERE lower(email) = …`) without an expression index.\n- `SELECT *` everywhere.\n- Running blocking migrations on large tables during peak traffic."
+    },
+    "questions": [
+     {
+      "question": "How do database indexes work, and what are the trade-offs?",
+      "answer": "Most indexes are B-trees: sorted structures that turn O(n) scans into O(log n) lookups for equality and range queries, and can satisfy `ORDER BY`. Composite indexes are ordered by their columns, so they help queries that filter on a leftmost prefix. Trade-offs: extra storage, slower inserts/updates/deletes, and the planner may still ignore them for low-selectivity predicates.",
+      "followUps": "- When would the planner ignore an index?\n- What's a covering index?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "A query is slow in production. How do you fix it?",
+      "answer": "Find it (slow query log, `pg_stat_statements`, APM). Reproduce with production-like data and run `EXPLAIN (ANALYZE, BUFFERS)`. Look for seq scans on large tables, bad row estimates (run ANALYZE / update statistics), nested loops over many rows, sorts spilling to disk. Fix with the right index, query rewrite (avoid functions on columns, reduce columns, fix N+1), pagination, caching, or denormalisation. Verify the improvement and monitor.",
+      "followUps": "- How do you add an index to a 500M row table without downtime?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Normalise a schema to 3NF and justify one denormalisation",
+     "Read an EXPLAIN ANALYZE output",
+     "Design composite indexes for 3 queries",
+     "Fix an N+1 query from an ORM",
+     "Plan a zero-downtime column rename"
+    ],
+    "resources": [
+     {
+      "title": "Use The Index, Luke",
+      "url": "https://use-the-index-luke.com/",
+      "kind": "book"
+     },
+     {
+      "title": "PostgreSQL: Using EXPLAIN",
+      "url": "https://www.postgresql.org/docs/current/using-explain.html",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Authentication & Authorization",
+    "icon": "🔑",
+    "summary": "Sessions vs JWT, OAuth 2.0, OIDC, password storage, RBAC/ABAC and token security.",
+    "difficulty": "intermediate",
+    "tags": [
+     "auth",
+     "security"
+    ],
+    "sections": {
+     "concept": "**Authentication** answers \"who are you?\"; **authorization** answers \"what can you do?\". You need to know session-based auth vs token-based (JWT), OAuth 2.0 and OpenID Connect flows, secure password storage, and access control models.",
+     "fundamentals": "- **Passwords**: hash with bcrypt/scrypt/Argon2 (slow, salted). Never encrypt or plain-hash.\n- **Sessions**: server stores session; client holds an opaque id in an HttpOnly cookie. Easy revocation.\n- **JWT**: signed, self-contained tokens; stateless verification, hard to revoke. Keep short-lived; pair with refresh tokens.\n- **OAuth 2.0**: delegated authorization. Authorization Code flow + **PKCE** for SPAs/mobile.\n- **OIDC**: identity layer on OAuth 2.0 (ID token, userinfo).\n- **RBAC** (roles) vs **ABAC** (attributes/policies) vs ReBAC (relationships).\n- MFA (TOTP, WebAuthn/passkeys).",
+     "advanced": "- **Refresh token rotation** with reuse detection.\n- JWT pitfalls: `alg: none`, weak secrets, not validating `aud`/`iss`/`exp`, storing sensitive data in payloads.\n- Session fixation, credential stuffing defences (rate limiting, breached password checks).\n- Centralised policy engines (OPA, Cedar), row-level security in Postgres.\n- SSO with SAML/OIDC for enterprises.",
+     "examples": "```js\n// Password hashing\nconst hash = await bcrypt.hash(password, 12);\nconst ok = await bcrypt.compare(attempt, hash);\n\n// Authorization middleware (RBAC)\nconst requireRole = (...roles) => (req, res, next) => {\n  if (!req.user) return res.status(401).end();\n  if (!roles.includes(req.user.role)) return res.status(403).end();\n  next();\n};\napp.delete('/posts/:id', requireRole('admin', 'editor'), deletePost);\n```",
+     "useCases": "- \"Sign in with Google\" via OIDC.\n- A multi-tenant SaaS enforcing tenant isolation on every query.\n- Passkeys for phishing-resistant login.",
+     "mistakes": "- Storing JWTs with long expiry in localStorage.\n- Checking permissions only in the UI.\n- Using the implicit OAuth flow for SPAs (deprecated).\n- Returning different errors for \"user not found\" vs \"wrong password\" (user enumeration)."
+    },
+    "questions": [
+     {
+      "question": "Sessions vs JWT: compare them.",
+      "answer": "**Sessions**: opaque id in a cookie, state on the server (DB/Redis). Simple revocation, small cookies, requires a shared session store to scale. **JWT**: signed claims verified without a lookup, good for distributed services, but revocation is hard (need short expiry + refresh tokens or a deny list), tokens are larger, and payloads are readable. For a typical web app, cookie sessions are often the simpler, safer choice.",
+      "followUps": "- How do you revoke a JWT?\n- Where should a SPA store tokens?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain the OAuth 2.0 Authorization Code flow with PKCE.",
+      "answer": "1. Client creates a random `code_verifier` and sends its hash (`code_challenge`) with the authorization request.\n2. User authenticates and consents at the authorization server.\n3. Server redirects back with a short-lived authorization `code`.\n4. Client exchanges the code + `code_verifier` at the token endpoint.\n5. Server verifies the verifier matches the challenge and returns access (and refresh/ID) tokens.\nPKCE stops an intercepted code from being exchanged by an attacker, which is why it's required for public clients.",
+      "followUps": "- What's the difference between OAuth and OIDC?\n- What's the `state` parameter for?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Implement password hashing and login with sessions",
+     "Explain JWT structure and validation steps",
+     "Draw the OAuth Authorization Code + PKCE flow",
+     "Implement RBAC middleware",
+     "Explain refresh token rotation"
+    ],
+    "resources": [
+     {
+      "title": "OWASP Authentication Cheat Sheet",
+      "url": "https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html",
+      "kind": "docs"
+     },
+     {
+      "title": "OAuth 2.0 Simplified",
+      "url": "https://www.oauth.com/",
+      "kind": "book"
+     },
+     {
+      "title": "jwt.io introduction",
+      "url": "https://jwt.io/introduction",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Caching & Redis",
+    "icon": "⚡",
+    "summary": "Cache strategies, invalidation, eviction, Redis data structures and pitfalls like stampedes.",
+    "difficulty": "intermediate",
+    "tags": [
+     "caching",
+     "redis",
+     "performance"
+    ],
+    "sections": {
+     "concept": "Caching stores the results of expensive operations closer to where they're needed. It exists at every layer: browser, CDN, reverse proxy, application (in-memory, Redis), and database. The hard part is **invalidation** and **consistency**.",
+     "fundamentals": "- **Cache-aside** (lazy loading): read cache → on miss read DB and populate. Most common.\n- **Write-through**: write to cache and DB together. **Write-behind**: write to cache, flush to DB async.\n- **TTL** and eviction policies: LRU, LFU, FIFO.\n- **Redis data structures**: strings, hashes, lists, sets, sorted sets, streams, HyperLogLog, bitmaps.\n- Redis is single-threaded for commands (atomic operations), in-memory, with optional persistence (RDB/AOF).\n- HTTP caching: `Cache-Control`, `ETag`, CDN edge caching.",
+     "advanced": "- **Cache stampede / thundering herd**: many requests miss at once. Fix with request coalescing, locks, probabilistic early expiration, stale-while-revalidate.\n- **Hot keys**: replicate or shard; local in-process cache in front of Redis.\n- **Consistency**: invalidate on write vs update; race between invalidate and repopulate.\n- Distributed locks (Redlock caveats), rate limiting with sorted sets or token buckets.\n- Redis Cluster sharding by hash slots; Sentinel for HA.",
+     "examples": "```js\nasync function getUser(id) {\n  const key = `user:${id}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n\n  const user = await db.users.findById(id);\n  if (user) await redis.set(key, JSON.stringify(user), 'EX', 300); // 5 min TTL\n  return user;\n}\n\nasync function updateUser(id, data) {\n  const user = await db.users.update(id, data);\n  await redis.del(`user:${id}`); // invalidate after write\n  return user;\n}\n\n// Sliding-window rate limiter with a sorted set\nasync function allow(userId, limit = 100, windowMs = 60_000) {\n  const key = `rl:${userId}`, now = Date.now();\n  await redis.zremrangebyscore(key, 0, now - windowMs);\n  const count = await redis.zcard(key);\n  if (count >= limit) return false;\n  await redis.zadd(key, now, `${now}-${Math.random()}`);\n  await redis.pexpire(key, windowMs);\n  return true;\n}\n```",
+     "useCases": "- Caching product pages and session data.\n- Leaderboards with sorted sets.\n- Rate limiting, distributed locks, pub/sub and job queues.",
+     "mistakes": "- Caching without a TTL or invalidation strategy.\n- Caching per-user data under a shared key (data leaks).\n- Treating Redis as a durable primary database without understanding persistence."
+    },
+    "questions": [
+     {
+      "question": "Explain cache-aside vs write-through vs write-behind.",
+      "answer": "- **Cache-aside**: app checks cache, loads from DB on miss and populates; writes go to DB and invalidate cache. Simple, resilient to cache failure, but first read is slow and there's a staleness window.\n- **Write-through**: every write updates cache and DB synchronously. Fresh cache, slower writes, caches data that may never be read.\n- **Write-behind**: write to cache, persist to DB asynchronously. Fast writes, risk of data loss, complex.",
+      "followUps": "- Why delete the cache key on update instead of setting it?\n- How do you handle a cache stampede?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What is a cache stampede and how do you prevent it?",
+      "answer": "When a popular key expires, many concurrent requests miss and all hit the database at once. Prevent with: a lock / single-flight so only one request recomputes while others wait or get stale data; stale-while-revalidate; probabilistic early refresh before expiry; jittered TTLs so keys don't expire together.",
+      "followUps": "- How does single-flight work across multiple servers?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Implement cache-aside with invalidation",
+     "Explain eviction policies",
+     "Build a rate limiter with Redis",
+     "Explain and prevent cache stampedes",
+     "Know Redis data structures and one use case each"
+    ],
+    "resources": [
+     {
+      "title": "Redis docs",
+      "url": "https://redis.io/docs/latest/",
+      "kind": "docs"
+     },
+     {
+      "title": "AWS: Caching best practices",
+      "url": "https://aws.amazon.com/caching/best-practices/",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Message Queues & Event-Driven Architecture",
+    "icon": "📨",
+    "summary": "Queues vs logs, delivery guarantees, idempotent consumers, outbox pattern and sagas.",
+    "difficulty": "advanced",
+    "tags": [
+     "queues",
+     "kafka",
+     "architecture"
+    ],
+    "sections": {
+     "concept": "Message queues decouple producers from consumers in time and scale. Event-driven architectures publish facts (\"OrderPlaced\") that other services react to. Key topics: **queues vs streams**, **delivery semantics**, **ordering**, **idempotency**, **retries and dead-letter queues**, and **consistency across services**.",
+     "fundamentals": "- **Queue** (RabbitMQ, SQS): messages consumed and removed; competing consumers for work distribution.\n- **Log / stream** (Kafka, Kinesis): append-only, retained; consumers track offsets; replayable; partitioned for scale and ordering per key.\n- **Delivery semantics**: at-most-once, at-least-once (most common), effectively-once via idempotency.\n- **Dead-letter queues** for messages that keep failing.\n- **Pub/sub** fan-out vs point-to-point.",
+     "advanced": "- **Ordering**: only guaranteed within a partition/key.\n- **Outbox pattern**: write the event to an outbox table in the same DB transaction, relay it to the broker. Avoids dual-write inconsistency.\n- **Sagas** (choreography vs orchestration) for distributed transactions with compensating actions.\n- **Event sourcing** and CQRS.\n- Consumer lag monitoring, backpressure, poison messages, schema evolution (Avro/Protobuf + registry).",
+     "examples": "```js\n// Idempotent consumer: dedupe by message id\nasync function handle(msg) {\n  const inserted = await db.query(\n    'INSERT INTO processed_messages (id) VALUES ($1) ON CONFLICT DO NOTHING',\n    [msg.id],\n  );\n  if (inserted.rowCount === 0) return; // duplicate, already processed\n  await sendWelcomeEmail(msg.payload.userId);\n}\n```\n```sql\n-- Outbox pattern: same transaction as the business write\nBEGIN;\nINSERT INTO orders (id, user_id, total) VALUES ($1, $2, $3);\nINSERT INTO outbox (id, type, payload) VALUES ($4, 'OrderPlaced', $5);\nCOMMIT;\n```",
+     "useCases": "- Sending emails / generating thumbnails asynchronously.\n- Order processing across payment, inventory and shipping services.\n- Activity streams and analytics pipelines with Kafka.",
+     "mistakes": "- Assuming exactly-once delivery.\n- Writing to the DB and publishing to the broker non-atomically (dual writes).\n- No DLQ, so one poison message blocks a queue forever."
+    },
+    "questions": [
+     {
+      "question": "Kafka vs RabbitMQ: when would you use each?",
+      "answer": "**RabbitMQ**: a traditional broker with flexible routing (exchanges), per-message acknowledgement, great for task queues and RPC-style work distribution with moderate throughput. **Kafka**: a distributed, partitioned, durable log with very high throughput, retention and replay, consumer groups tracking offsets; ideal for event streaming, analytics, event sourcing and multiple independent consumers of the same events.",
+      "followUps": "- How does Kafka guarantee ordering?\n- What happens when a consumer in a group dies?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "How do you guarantee consistency between a database write and publishing an event?",
+      "answer": "Avoid dual writes. Use the **transactional outbox**: write business data and the event to an outbox table in one transaction; a relay (poller or CDC like Debezium) publishes outbox rows to the broker and marks them sent. Delivery is at-least-once, so consumers must be idempotent.",
+      "followUps": "- What is change data capture?\n- Choreography vs orchestration sagas?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain at-most/at-least/exactly-once semantics",
+     "Implement an idempotent consumer",
+     "Explain the outbox pattern",
+     "Design a saga for order checkout",
+     "Explain Kafka partitions and consumer groups"
+    ],
+    "resources": [
+     {
+      "title": "Microservices.io: Transactional outbox",
+      "url": "https://microservices.io/patterns/data/transactional-outbox.html",
+      "kind": "article"
+     },
+     {
+      "title": "Kafka documentation",
+      "url": "https://kafka.apache.org/documentation/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "System Design",
+    "icon": "🏛️",
+    "summary": "A repeatable framework for backend system design interviews with classic problems.",
+    "difficulty": "advanced",
+    "tags": [
+     "system-design",
+     "architecture"
+    ],
+    "sections": {
+     "concept": "System design interviews evaluate how you design large-scale systems under ambiguity. There is no single right answer; what matters is **structured thinking**, **reasonable estimates**, **clear trade-offs**, and **depth where it matters**.",
+     "fundamentals": "A framework:\n1. **Requirements**: functional, non-functional (scale, latency, availability, consistency), out of scope.\n2. **Estimates**: QPS, storage, bandwidth (back-of-the-envelope).\n3. **API design**: core endpoints.\n4. **Data model** and storage choice.\n5. **High-level design**: clients, load balancer, services, DBs, caches, queues, CDN.\n6. **Deep dives**: bottlenecks, scaling, failure modes.\n7. **Trade-offs & wrap-up**: what you'd improve next.\n\nUseful numbers: 1 day ≈ 86,400 s (~10⁵); 1M requests/day ≈ 12 QPS; memory read ~100 ns, SSD ~100 µs, cross-region round-trip ~100 ms.",
+     "advanced": "- **Unique IDs**: UUID, Snowflake (time + machine + sequence).\n- **Consistent hashing** for distributing keys with minimal reshuffling.\n- **Rate limiting**: token bucket, leaky bucket, sliding window.\n- **Fan-out on write vs read** for feeds (celebrity problem).\n- **Geo-distribution**, multi-region active-active, data residency.\n- **Observability**: logs, metrics, traces, SLOs and error budgets.",
+     "examples": "```text\nDesign a URL shortener\n- Req: shorten, redirect, custom aliases, 100M new URLs/month, reads 100:1\n- Estimates: ~40 writes/s, ~4k reads/s; 100M * 12 * 5y * 500B ≈ 3TB\n- API: POST /urls {longUrl} -> {code}; GET /{code} -> 301/302\n- ID: base62 of a counter (range allocation per server) or hash + collision check\n- Storage: KV store (code -> url), replicated; cache hot codes in Redis; CDN edge\n- Redirect: 302 if you need analytics, 301 for cacheability\n- Analytics: async events to a queue -> stream processing\n```",
+     "useCases": "- URL shortener, rate limiter, news feed, chat, notification system, file storage (Dropbox), video streaming, ride sharing, web crawler, search autocomplete.",
+     "mistakes": "- Diving into details before requirements and estimates.\n- Single points of failure left unaddressed.\n- Naming technologies without justifying them.\n- Not discussing trade-offs or failure modes."
+    },
+    "questions": [
+     {
+      "question": "Design a rate limiter.",
+      "answer": "Clarify: per user/IP/API key, limits, distributed, hard or soft. Algorithms: **token bucket** (allows bursts, simple), **leaky bucket** (smooth output), **fixed window** (simple, boundary bursts), **sliding window log/counter** (accurate). Implementation: middleware or API gateway, counters in Redis with atomic Lua scripts or `INCR` + `EXPIRE`, return `429` with `Retry-After` and rate limit headers. Discuss multi-region consistency vs latency, failing open vs closed, and hot keys.",
+      "followUps": "- How do you rate limit across multiple data centres?\n- Token bucket vs sliding window trade-offs?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Design a chat application like WhatsApp.",
+      "answer": "Requirements: 1:1 and group chat, online presence, delivery/read receipts, offline delivery, history. Connections via WebSockets to stateless gateway servers; a session service maps users → gateway. Messages persisted (Cassandra-style wide-column partitioned by conversation, ordered by time/Snowflake id). Fan-out for groups via a queue. Offline users get push notifications and fetch history on reconnect. Ordering per conversation, at-least-once delivery with client-side dedupe by message id, end-to-end encryption considerations.",
+      "followUps": "- How do you scale WebSocket servers?\n- How do you implement read receipts in groups?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Practice the framework on 8 classic problems",
+     "Do back-of-the-envelope estimates quickly",
+     "Explain consistent hashing",
+     "Explain rate limiting algorithms",
+     "Explain fan-out on write vs read"
+    ],
+    "resources": [
+     {
+      "title": "System Design Primer",
+      "url": "https://github.com/donnemartin/system-design-primer",
+      "kind": "repo"
+     },
+     {
+      "title": "ByteByteGo blog",
+      "url": "https://blog.bytebytego.com/",
+      "kind": "article"
+     },
+     {
+      "title": "Designing Data-Intensive Applications",
+      "url": "https://dataintensive.net/",
+      "kind": "book"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Scalability & Distributed Systems",
+    "icon": "🌍",
+    "summary": "Horizontal scaling, load balancing, replication, consensus, and failure handling.",
+    "difficulty": "advanced",
+    "tags": [
+     "distributed-systems",
+     "scalability"
+    ],
+    "sections": {
+     "concept": "Scaling means handling more load without degrading latency or reliability. Distributed systems add the hard parts: **partial failure**, **network unreliability**, **clock skew**, and **consistency**. Designs must assume things fail and degrade gracefully.",
+     "fundamentals": "- **Vertical vs horizontal scaling**; stateless services scale horizontally behind load balancers.\n- **Load balancing**: round robin, least connections, consistent hashing; L4 vs L7.\n- **Replication** for availability and read scaling; **partitioning** for write scaling.\n- **Availability math**: 99.9% ≈ 8.8 h downtime/year; 99.99% ≈ 53 min.\n- Timeouts, retries with backoff and jitter, circuit breakers, bulkheads.\n- Health checks and autoscaling.",
+     "advanced": "- **Consensus**: Raft/Paxos for leader election and replicated logs (etcd, ZooKeeper).\n- **Quorums**: R + W > N for read-after-write in leaderless systems.\n- **Clocks**: logical clocks, vector clocks, hybrid logical clocks; don't trust wall clocks for ordering.\n- **Idempotency** everywhere because retries happen.\n- **Backpressure** and load shedding under overload.\n- **Fallacies of distributed computing**.",
+     "examples": "```js\n// Circuit breaker sketch\nclass CircuitBreaker {\n  constructor(fn, { threshold = 5, cooldownMs = 10_000 } = {}) {\n    Object.assign(this, { fn, threshold, cooldownMs, failures: 0, openedAt: 0 });\n  }\n  async call(...args) {\n    if (this.failures >= this.threshold) {\n      if (Date.now() - this.openedAt < this.cooldownMs) throw new Error('circuit open');\n      this.failures = this.threshold - 1; // half-open: allow one trial\n    }\n    try {\n      const res = await this.fn(...args);\n      this.failures = 0;\n      return res;\n    } catch (e) {\n      if (++this.failures >= this.threshold) this.openedAt = Date.now();\n      throw e;\n    }\n  }\n}\n```",
+     "useCases": "- Scaling an API from 100 to 100k RPS.\n- Keeping checkout working when the recommendation service is down.",
+     "mistakes": "- Retrying without backoff, amplifying outages.\n- Storing session state in server memory, preventing horizontal scaling.\n- Ignoring tail latency (p99) and only looking at averages."
+    },
+    "questions": [
+     {
+      "question": "How would you scale a web application from 1k to 1M users?",
+      "answer": "Iteratively, measuring each step: single server → separate DB → stateless app servers behind a load balancer → CDN for static assets → caching layer (Redis) → DB read replicas → async work via queues → connection pooling → partition/shard the DB or split services by domain → multi-region for latency and resilience. Add observability, autoscaling and load testing throughout.",
+      "followUps": "- What breaks first, usually?\n- How do you handle session state across servers?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "What is a circuit breaker and why use one?",
+      "answer": "A circuit breaker wraps calls to a dependency and tracks failures. After a threshold, it **opens** and fails fast instead of waiting on timeouts, giving the dependency time to recover and protecting your threads/connections. After a cooldown it goes **half-open** and lets a trial request through; success closes it. Combine with fallbacks (cached data, degraded features).",
+      "followUps": "- How does it differ from retries?\n- What are bulkheads?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain load balancing algorithms and L4 vs L7",
+     "Explain replication and partitioning trade-offs",
+     "Explain Raft at a high level",
+     "Explain timeouts, retries, circuit breakers, bulkheads",
+     "Compute availability for serial and parallel components"
+    ],
+    "resources": [
+     {
+      "title": "Fallacies of distributed computing",
+      "url": "https://en.wikipedia.org/wiki/Fallacies_of_distributed_computing",
+      "kind": "article"
+     },
+     {
+      "title": "The Raft consensus algorithm",
+      "url": "https://raft.github.io/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Docker & Deployment",
+    "icon": "🐳",
+    "summary": "Containers, Dockerfiles, compose, CI/CD, environments and zero-downtime deploys.",
+    "difficulty": "intermediate",
+    "tags": [
+     "docker",
+     "devops",
+     "deployment"
+    ],
+    "sections": {
+     "concept": "Containers package an application with its dependencies into a portable image that runs the same everywhere. Combined with CI/CD, they make deployments repeatable. Interviews ask about **images vs containers**, **Dockerfile best practices**, **networking/volumes**, **orchestration basics**, and **deployment strategies**.",
+     "fundamentals": "- **Image**: immutable layered filesystem + metadata; **container**: a running instance with its own process namespace.\n- Dockerfile instructions: `FROM`, `WORKDIR`, `COPY`, `RUN`, `ENV`, `EXPOSE`, `CMD`/`ENTRYPOINT`.\n- **Layer caching**: copy dependency manifests and install before copying source.\n- **Multi-stage builds** for small production images.\n- **docker compose** for local multi-service setups.\n- Volumes for persistent data; networks for service discovery.\n- 12-factor app: config in env, stateless processes, logs to stdout.",
+     "advanced": "- **Kubernetes** basics: pods, deployments, services, ingress, config maps, secrets, probes, HPA.\n- **Deployment strategies**: rolling, blue-green, canary, feature flags.\n- Security: non-root users, minimal base images (distroless/alpine), image scanning, no secrets in images.\n- Infrastructure as code (Terraform), GitOps.\n- Observability in production: structured logs, metrics, tracing, alerting.",
+     "examples": "```dockerfile\n# Multi-stage build for a Node app\nFROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\n\nFROM node:22-alpine AS build\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN npm run build\n\nFROM node:22-alpine\nWORKDIR /app\nENV NODE_ENV=production\nUSER node\nCOPY --from=build /app/dist ./dist\nCOPY --from=deps /app/node_modules ./node_modules\nEXPOSE 3000\nCMD [\"node\", \"dist/server.js\"]\n```",
+     "useCases": "- Consistent dev environments with compose (app + Postgres + Redis).\n- Canary releases to catch regressions with 5% of traffic.",
+     "mistakes": "- Copying the whole source before `npm ci`, busting the cache on every change.\n- Running as root, huge images, baking secrets into layers.\n- No health checks, so traffic hits containers that aren't ready."
+    },
+    "questions": [
+     {
+      "question": "What is the difference between a container and a virtual machine?",
+      "answer": "VMs virtualise hardware and run a full guest OS on a hypervisor: strong isolation, heavier, slower to start. Containers share the host kernel and isolate processes with namespaces and cgroups: lightweight, start in milliseconds, higher density, slightly weaker isolation.",
+      "followUps": "- What are namespaces and cgroups?\n- What is the difference between CMD and ENTRYPOINT?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Explain blue-green vs canary deployments.",
+      "answer": "**Blue-green**: run two identical environments; deploy to the idle one, test, then switch all traffic at once. Instant rollback by switching back; needs double capacity and careful DB migrations. **Canary**: release to a small percentage of traffic, monitor metrics, gradually increase. Limits blast radius; needs good observability and traffic splitting.",
+      "followUps": "- How do database migrations fit in?\n- How do feature flags complement these?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Write a multi-stage Dockerfile with good caching",
+     "Run a compose stack with app, DB and cache",
+     "Explain rolling, blue-green and canary deployments",
+     "Set up a CI pipeline that tests, builds and deploys",
+     "Explain Kubernetes pods, deployments and services"
+    ],
+    "resources": [
+     {
+      "title": "Docker docs: Best practices",
+      "url": "https://docs.docker.com/build/building/best-practices/",
+      "kind": "docs"
+     },
+     {
+      "title": "The Twelve-Factor App",
+      "url": "https://12factor.net/",
+      "kind": "article"
+     },
+     {
+      "title": "Kubernetes Basics tutorial",
+      "url": "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
+      "kind": "course"
+     }
+    ],
+    "children": []
+   }
+  ]
+ },
+ {
+  "name": "AI Engineering",
+  "icon": "🤖",
+  "description": "Python, ML foundations, LLMs, RAG, agents, evaluation and production AI systems.",
+  "topics": [
+   {
+    "title": "Python Fundamentals",
+    "icon": "🐍",
+    "summary": "Data model, comprehensions, generators, decorators, typing, async and the GIL.",
+    "difficulty": "beginner",
+    "tags": [
+     "python",
+     "core"
+    ],
+    "sections": {
+     "concept": "Python is the lingua franca of AI engineering. Interviews check that you write idiomatic Python (comprehensions, generators, context managers), understand its **data model** (mutability, references), and know practical concerns like **typing**, **async I/O** for API-heavy LLM apps, and the **GIL**.",
+     "fundamentals": "- Built-in types: `list`, `tuple`, `dict`, `set`; mutable vs immutable; everything is an object passed by reference to the object.\n- Comprehensions and generator expressions; `enumerate`, `zip`, `itertools`, `collections` (`Counter`, `defaultdict`, `deque`).\n- Functions: default args (never mutable defaults), `*args`/`**kwargs`, keyword-only args, closures.\n- **Decorators** wrap functions; `functools.wraps`, `lru_cache`.\n- **Context managers** (`with`) for resource cleanup.\n- **Classes**: dunder methods, `@dataclass`, `@property`, inheritance and MRO.\n- **Type hints** + `mypy`/`pyright`; `pydantic` for runtime validation.",
+     "advanced": "- **Generators** and `yield` for lazy pipelines (streaming tokens, batching data).\n- **asyncio**: `async def`, `await`, `asyncio.gather`, semaphores for concurrency limits against rate-limited APIs.\n- **GIL**: one thread executes Python bytecode at a time; threads still help for I/O; use multiprocessing or native libs (NumPy) for CPU work. Free-threaded builds are emerging.\n- Packaging and environments: `venv`, `uv`, `pyproject.toml`.\n- NumPy vectorisation vs Python loops.",
+     "examples": "```python\nimport asyncio\nfrom functools import wraps\nimport time\n\ndef timed(fn):\n    @wraps(fn)\n    async def wrapper(*args, **kwargs):\n        start = time.perf_counter()\n        try:\n            return await fn(*args, **kwargs)\n        finally:\n            print(f\"{fn.__name__} took {time.perf_counter() - start:.2f}s\")\n    return wrapper\n\nsem = asyncio.Semaphore(5)  # max 5 concurrent LLM calls\n\n@timed\nasync def embed(text: str) -> list[float]:\n    async with sem:\n        return await client.embed(text)\n\nasync def main(texts: list[str]):\n    return await asyncio.gather(*(embed(t) for t in texts))\n\ndef batched(items, n):\n    for i in range(0, len(items), n):\n        yield items[i:i + n]\n```",
+     "useCases": "- Concurrent embedding/LLM calls with rate limiting.\n- Data cleaning pipelines with generators.\n- FastAPI services with pydantic models for AI backends.",
+     "mistakes": "- Mutable default arguments (`def f(x=[])`).\n- Using threads for CPU-bound work and expecting speedups.\n- Blocking calls (`requests`) inside async code.\n- Modifying a list while iterating over it."
+    },
+    "questions": [
+     {
+      "question": "What is the difference between a list and a tuple?",
+      "answer": "Lists are mutable, tuples are immutable. Tuples are hashable (if their contents are), so they can be dict keys or set members, are slightly more memory-efficient, and signal \"fixed structure\" (like a record). Lists are for homogeneous, changing collections.",
+      "followUps": "- Can a tuple contain a mutable object? What happens then?",
+      "difficulty": "beginner"
+     },
+     {
+      "question": "Explain generators and why they're useful.",
+      "answer": "A generator function uses `yield` to produce values lazily, pausing its state between calls. They use constant memory for large or infinite sequences, compose into pipelines, and are perfect for streaming (reading huge files, streaming LLM tokens, batching data).",
+      "followUps": "- What is `yield from`?\n- Generator vs iterator?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What is the GIL and how does it affect concurrency?",
+      "answer": "The Global Interpreter Lock lets only one thread execute Python bytecode at a time in CPython. Threads still work for I/O-bound tasks (the GIL is released while waiting), but CPU-bound Python code won't run in parallel. Use `multiprocessing`, native extensions (NumPy, PyTorch release the GIL), or `asyncio` for high-concurrency I/O.",
+      "followUps": "- When would you choose asyncio over threads?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Write decorators, context managers and generators from memory",
+     "Use asyncio.gather with a semaphore",
+     "Explain the GIL",
+     "Use dataclasses and pydantic models",
+     "Know collections and itertools helpers"
+    ],
+    "resources": [
+     {
+      "title": "Python Tutorial",
+      "url": "https://docs.python.org/3/tutorial/",
+      "kind": "docs"
+     },
+     {
+      "title": "Real Python",
+      "url": "https://realpython.com/",
+      "kind": "article"
+     },
+     {
+      "title": "Fluent Python",
+      "url": "https://www.oreilly.com/library/view/fluent-python-2nd/9781492056348/",
+      "kind": "book"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Machine Learning Fundamentals",
+    "icon": "📊",
+    "summary": "Supervised vs unsupervised learning, bias-variance, overfitting, metrics and gradient descent.",
+    "difficulty": "intermediate",
+    "tags": [
+     "ml",
+     "fundamentals"
+    ],
+    "sections": {
+     "concept": "Even application-focused AI engineers need ML fundamentals to reason about model behaviour, evaluation and failure modes. Know the **learning paradigms**, **loss functions and gradient descent**, the **bias-variance trade-off**, **regularisation**, and how to **evaluate** models properly.",
+     "fundamentals": "- **Supervised** (labelled data: classification, regression), **unsupervised** (clustering, dimensionality reduction), **self-supervised** (how LLMs are pre-trained), **reinforcement learning**.\n- **Train / validation / test** splits; cross-validation; data leakage.\n- **Loss functions**: MSE for regression, cross-entropy for classification.\n- **Gradient descent**: update weights opposite to the gradient; learning rate; SGD, Adam.\n- **Overfitting vs underfitting**; bias-variance trade-off.\n- **Regularisation**: L1/L2, dropout, early stopping, data augmentation.\n- **Metrics**: accuracy, precision, recall, F1, ROC-AUC, PR-AUC; RMSE/MAE.",
+     "advanced": "- **Backpropagation** applies the chain rule through the computational graph.\n- **Class imbalance**: resampling, class weights, choosing PR-AUC over accuracy.\n- **Feature engineering**, normalisation, embeddings for categorical features.\n- **Neural nets**: activations (ReLU, GELU), normalisation layers, vanishing gradients, residual connections.\n- **Calibration** of predicted probabilities.",
+     "examples": "```python\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import classification_report\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nmodel = LogisticRegression(C=1.0, class_weight=\"balanced\").fit(X_train, y_train)\nprint(classification_report(y_test, model.predict(X_test)))\n\n# Gradient descent for linear regression, by hand\nimport numpy as np\nw = np.zeros(X.shape[1])\nfor _ in range(1000):\n    grad = 2 / len(X) * X.T @ (X @ w - y)\n    w -= 0.01 * grad\n```",
+     "useCases": "- Spam/fraud classifiers, recommendation systems, demand forecasting.\n- Understanding why an LLM fine-tune overfits on a small dataset.",
+     "mistakes": "- Reporting accuracy on imbalanced data.\n- Tuning hyperparameters on the test set.\n- Data leakage (features that include future information)."
+    },
+    "questions": [
+     {
+      "question": "Explain the bias-variance trade-off.",
+      "answer": "Error decomposes into **bias** (error from overly simple assumptions, so the model underfits), **variance** (sensitivity to the training data, so it overfits), and irreducible noise. Increasing model complexity lowers bias but raises variance. You manage it with model choice, regularisation, more data, and validation-based tuning.",
+      "followUps": "- How do you detect overfitting?\n- How does regularisation reduce variance?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "Precision vs recall: when do you optimise for each?",
+      "answer": "**Precision** = TP / (TP + FP): of the positives you predicted, how many were right. **Recall** = TP / (TP + FN): of the actual positives, how many you found. Optimise precision when false positives are costly (spam filter hiding real email); recall when false negatives are costly (cancer screening, fraud). F1 balances them; threshold tuning moves along the trade-off.",
+      "followUps": "- What does a ROC curve show?\n- When is PR-AUC better than ROC-AUC?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain supervised vs unsupervised vs self-supervised learning",
+     "Explain gradient descent and backprop intuitively",
+     "Explain bias-variance with examples",
+     "Choose metrics for imbalanced problems",
+     "Train and evaluate a simple model with scikit-learn"
+    ],
+    "resources": [
+     {
+      "title": "Google ML Crash Course",
+      "url": "https://developers.google.com/machine-learning/crash-course",
+      "kind": "course"
+     },
+     {
+      "title": "Andrew Ng: Machine Learning Specialization",
+      "url": "https://www.coursera.org/specializations/machine-learning-introduction",
+      "kind": "course"
+     },
+     {
+      "title": "3Blue1Brown: Neural Networks",
+      "url": "https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi",
+      "kind": "video"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "LLM Architecture & Concepts",
+    "icon": "🧠",
+    "summary": "Tokens, pre-training, instruction tuning, RLHF, context windows, sampling, and limitations.",
+    "difficulty": "intermediate",
+    "tags": [
+     "llm",
+     "core"
+    ],
+    "sections": {
+     "concept": "Large language models are transformer networks trained to predict the next token on massive text corpora, then refined with instruction tuning and preference optimisation to follow instructions helpfully and safely. Understanding **tokenisation**, **context windows**, **sampling**, and **failure modes** (hallucination, prompt injection) is essential for building reliable applications.",
+     "fundamentals": "- **Tokens**: subword units (BPE). Cost, latency and context limits are measured in tokens.\n- **Pre-training**: self-supervised next-token prediction on large corpora.\n- **Post-training**: supervised fine-tuning (SFT) on instructions, then preference optimisation (RLHF, DPO, constitutional methods).\n- **Context window**: maximum tokens of input + output the model attends to.\n- **Sampling**: temperature, top-p, top-k; deterministic vs creative outputs.\n- **Inference**: prefill (process prompt) and decode (generate token by token); KV cache.\n- Limitations: hallucination, knowledge cutoff, sensitivity to prompt phrasing, prompt injection.",
+     "advanced": "- **Scaling laws**: loss improves predictably with parameters, data and compute.\n- **Mixture of Experts** routes tokens to subsets of parameters.\n- **Long context**: positional encodings (RoPE), attention cost, \"lost in the middle\".\n- **Inference optimisation**: quantisation, speculative decoding, batching, prompt caching.\n- **Reasoning models** spend extra tokens thinking before answering.\n- **Multimodality**: images, audio, documents as inputs.",
+     "examples": "```python\n# Typical chat completion call shape (provider SDKs differ slightly)\nresponse = client.messages.create(\n    model=\"<model-id>\",\n    max_tokens=1024,\n    temperature=0.2,          # low for factual / structured tasks\n    system=\"You are a concise senior engineer.\",\n    messages=[{\"role\": \"user\", \"content\": \"Explain the KV cache in 3 bullets.\"}],\n)\nprint(response.content[0].text)\nprint(response.usage)  # input/output tokens drive cost and latency\n```",
+     "useCases": "- Summarisation, extraction, classification, code generation, conversational assistants, agents.",
+     "mistakes": "- Treating the model as a database of facts.\n- Ignoring token costs and latency at scale.\n- Using high temperature for tasks that need consistency.\n- Trusting model output that will be executed or displayed without validation."
+    },
+    "questions": [
+     {
+      "question": "How does an LLM generate text?",
+      "answer": "The prompt is tokenised and run through the transformer once (prefill), producing a probability distribution over the vocabulary for the next token. A sampling strategy (greedy, temperature, top-p) picks a token, which is appended and fed back to predict the next one (decode), reusing cached keys/values (KV cache) so earlier tokens aren't recomputed. This repeats until a stop token or the max tokens limit.",
+      "followUps": "- What do temperature and top-p do?\n- Why is output generation slower per token than prompt processing?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What causes hallucinations and how do you reduce them?",
+      "answer": "Models are trained to produce plausible continuations, not verified facts; gaps in knowledge, ambiguous prompts and pressure to answer produce confident fabrications. Mitigations: ground answers with retrieval (RAG) and require citations, allow \"I don't know\", lower temperature, constrain output formats, use tools for facts and calculations, verify with a second pass or evaluator, and evaluate systematically.",
+      "followUps": "- How would you measure hallucination rate?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "What is RLHF and how does it differ from DPO?",
+      "answer": "**RLHF**: collect human preference comparisons, train a reward model, then optimise the policy (LLM) with RL (e.g. PPO) to maximise reward while staying close to the base model (KL penalty). **DPO** skips the explicit reward model and RL loop, optimising the policy directly on preference pairs with a classification-style loss: simpler and more stable.",
+      "followUps": "- What is reward hacking?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain tokenisation and why it affects cost",
+     "Explain pre-training vs SFT vs preference tuning",
+     "Explain sampling parameters",
+     "Explain the KV cache and prefill vs decode",
+     "List 5 LLM failure modes and mitigations"
+    ],
+    "resources": [
+     {
+      "title": "Andrej Karpathy: Intro to Large Language Models",
+      "url": "https://www.youtube.com/watch?v=zjkBMFhNj_g",
+      "kind": "video"
+     },
+     {
+      "title": "Anthropic docs",
+      "url": "https://docs.anthropic.com/",
+      "kind": "docs"
+     },
+     {
+      "title": "Hugging Face LLM Course",
+      "url": "https://huggingface.co/learn/llm-course",
+      "kind": "course"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Transformers & Attention",
+    "icon": "🔦",
+    "summary": "Self-attention, multi-head attention, positional encoding and transformer blocks.",
+    "difficulty": "advanced",
+    "tags": [
+     "llm",
+     "transformers",
+     "deep-learning"
+    ],
+    "sections": {
+     "concept": "The transformer replaced recurrence with **attention**: every token computes how much to attend to every other token, enabling parallel training and long-range dependencies. Decoder-only transformers (GPT-style) with causal masking power today's LLMs.",
+     "fundamentals": "- **Embeddings** map tokens to vectors; **positional information** (sinusoidal, learned, RoPE) is added because attention is order-agnostic.\n- **Self-attention**: project inputs to queries Q, keys K, values V; `Attention(Q,K,V) = softmax(QKᵀ / √d_k) V`.\n- **Multi-head attention** runs several attention heads in parallel to capture different relationships.\n- **Transformer block**: attention → residual + layer norm → feed-forward MLP → residual + layer norm.\n- **Causal masking** prevents attending to future tokens in decoders.\n- Encoder-only (BERT), decoder-only (GPT), encoder-decoder (T5).",
+     "advanced": "- Attention is **O(n²)** in sequence length: FlashAttention (IO-aware exact attention), sparse/sliding-window attention, linear attention approximations.\n- **KV cache** memory grows with context × layers × heads; GQA/MQA share keys/values across heads to shrink it.\n- Pre-norm vs post-norm, SwiGLU activations, RMSNorm.\n- Why `√d_k` scaling: keeps dot products from growing large and saturating softmax.",
+     "examples": "```python\nimport torch, torch.nn.functional as F\n\ndef attention(q, k, v, causal=True):\n    # q, k, v: (batch, heads, seq, d_k)\n    d_k = q.size(-1)\n    scores = q @ k.transpose(-2, -1) / d_k ** 0.5\n    if causal:\n        seq = q.size(-2)\n        mask = torch.triu(torch.ones(seq, seq, dtype=torch.bool), diagonal=1)\n        scores = scores.masked_fill(mask, float(\"-inf\"))\n    weights = F.softmax(scores, dim=-1)\n    return weights @ v\n```",
+     "useCases": "- Explaining context-length costs to product teams.\n- Choosing models (encoder vs decoder) for classification vs generation.",
+     "mistakes": "- Saying transformers \"understand order\" without positional encoding.\n- Forgetting the scaling factor or masking in implementations.\n- Assuming longer context is free."
+    },
+    "questions": [
+     {
+      "question": "Explain self-attention step by step.",
+      "answer": "Each token embedding is linearly projected into a query, key and value. For each token, dot products of its query with all keys give relevance scores, scaled by √d_k and passed through softmax to get attention weights summing to 1. The output is the weighted sum of values. Multi-head attention does this in parallel with different projections, concatenates the results and projects them again. In decoders a causal mask blocks future positions.",
+      "followUps": "- Why scale by √d_k?\n- What does each head learn?\n- What is cross-attention?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Why did transformers replace RNNs?",
+      "answer": "RNNs process tokens sequentially, which limits parallelism during training and makes long-range dependencies hard (vanishing gradients). Transformers process all tokens in parallel with attention giving direct paths between any two positions, scaling much better on GPUs and capturing long-range context. The cost is quadratic attention in sequence length.",
+      "followUps": "- What are state-space models (Mamba) and why are they interesting?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Write scaled dot-product attention from scratch",
+     "Draw a transformer block",
+     "Explain positional encodings and RoPE",
+     "Explain encoder vs decoder vs encoder-decoder",
+     "Explain why attention is quadratic and mitigations"
+    ],
+    "resources": [
+     {
+      "title": "Attention Is All You Need",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "kind": "article"
+     },
+     {
+      "title": "The Illustrated Transformer",
+      "url": "https://jalammar.github.io/illustrated-transformer/",
+      "kind": "article"
+     },
+     {
+      "title": "Karpathy: Let's build GPT from scratch",
+      "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+      "kind": "video"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Prompt Engineering",
+    "icon": "✍️",
+    "summary": "Clear instructions, examples, structure, chain of thought, output formats and prompt injection.",
+    "difficulty": "beginner",
+    "tags": [
+     "llm",
+     "prompting"
+    ],
+    "sections": {
+     "concept": "Prompt engineering is the practice of communicating a task to a model so it performs reliably. Good prompts are **specific**, give **context and examples**, define the **output format**, and are **tested against an evaluation set** rather than tweaked by vibes.",
+     "fundamentals": "- Be explicit: role, task, audience, constraints, success criteria.\n- Provide context and relevant data; separate it with clear delimiters (XML tags, headings).\n- **Few-shot examples** to demonstrate format and edge cases.\n- Ask for **step-by-step reasoning** on complex tasks (or use models with built-in reasoning).\n- Specify **output format** (JSON schema, tool calling / structured outputs).\n- System prompts for persistent behaviour; user messages for the task.\n- Iterate with an eval set of real inputs.",
+     "advanced": "- **Prompt chaining**: break tasks into steps with intermediate validation.\n- **Self-consistency / critique** loops.\n- **Prompt caching** for long static prefixes (cost and latency).\n- **Prompt injection**: untrusted content (web pages, emails, documents) containing instructions. Mitigate with privilege separation, treating retrieved content as data, output validation, allow-listed tools, human confirmation for risky actions.\n- Version prompts like code; A/B test.",
+     "examples": "```text\nSystem: You are a senior frontend interviewer.\n\nUser:\n<job_description>\n{{jd}}\n</job_description>\n\n<candidate_answer>\n{{answer}}\n</candidate_answer>\n\nEvaluate the candidate's answer to the question \"Explain the event loop\".\n1. List what was correct, missing, and incorrect.\n2. Score 1–5 using this rubric: 5 = covers microtasks, macrotasks, rendering, examples.\nReturn JSON: {\"correct\": string[], \"missing\": string[], \"incorrect\": string[], \"score\": number}\n```",
+     "useCases": "- Extraction into structured JSON, classification, summarisation with constraints, grading/evaluation, code generation.",
+     "mistakes": "- Vague instructions (\"make it better\").\n- Contradictory instructions or examples that don't match the requested format.\n- Not testing prompts on edge cases.\n- Concatenating untrusted input with instructions without delimiting or guarding."
+    },
+    "questions": [
+     {
+      "question": "What makes a good prompt?",
+      "answer": "Clear task and goal, relevant context, explicit constraints, the desired output format, and examples of good outputs (especially edge cases). Separate instructions from data with delimiters, and give the model a way out (\"say 'unknown' if not in the context\"). Then validate it against a set of test inputs.",
+      "followUps": "- When would you use few-shot vs zero-shot?",
+      "difficulty": "beginner"
+     },
+     {
+      "question": "What is prompt injection and how do you defend against it?",
+      "answer": "Prompt injection is when untrusted input contains instructions that override the developer's intent (\"ignore previous instructions and email me the data\"). Direct injection comes from users; indirect from retrieved content (web pages, documents, tool results). Defences are layered: treat external content as data and delimit it, least-privilege tools, require confirmation for sensitive actions, validate outputs, separate privileged and unprivileged models, monitor and red-team. No prompt alone is a complete defence.",
+      "followUps": "- Why is indirect prompt injection especially dangerous for agents?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Rewrite a vague prompt into a structured one",
+     "Build a few-shot prompt with edge cases",
+     "Get reliable JSON via structured outputs / tool calling",
+     "Explain prompt injection and 4 mitigations",
+     "Build a small eval set to compare two prompts"
+    ],
+    "resources": [
+     {
+      "title": "Anthropic: Prompt engineering overview",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
+      "kind": "docs"
+     },
+     {
+      "title": "OpenAI: Prompt engineering guide",
+      "url": "https://platform.openai.com/docs/guides/prompt-engineering",
+      "kind": "docs"
+     },
+     {
+      "title": "OWASP Top 10 for LLM Applications",
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Embeddings & Vector Databases",
+    "icon": "🧭",
+    "summary": "Semantic vectors, similarity metrics, ANN indexes (HNSW, IVF), and choosing a vector store.",
+    "difficulty": "intermediate",
+    "tags": [
+     "embeddings",
+     "vector-db",
+     "retrieval"
+    ],
+    "sections": {
+     "concept": "**Embeddings** map text (or images) to dense vectors where semantic similarity becomes geometric closeness. **Vector databases** store these vectors and support fast **approximate nearest neighbour (ANN)** search with metadata filtering, which is the backbone of semantic search and RAG.",
+     "fundamentals": "- Embedding models produce fixed-size vectors (e.g. 384–3072 dimensions).\n- **Similarity**: cosine similarity, dot product, Euclidean distance (cosine = dot product on normalised vectors).\n- **Exact search** is O(n); ANN trades a little recall for big speedups.\n- **Indexes**: HNSW (graph-based, fast, memory-heavy), IVF (clustering), PQ (compression).\n- **Options**: pgvector (Postgres), Pinecone, Weaviate, Qdrant, Milvus, Chroma, FAISS (library).\n- **Metadata filtering** (tenant, date, type) combined with vector search.",
+     "advanced": "- **Hybrid search**: combine BM25/keyword with vectors (e.g. reciprocal rank fusion).\n- **Re-ranking** with cross-encoders for precision.\n- Index tuning: HNSW `M`, `ef_construction`, `ef_search` trade recall vs latency.\n- Embedding drift: re-embed everything when changing models.\n- Matryoshka embeddings, quantisation for storage cost.\n- Multi-tenancy and access control in retrieval.",
+     "examples": "```sql\n-- pgvector: semantic search with a metadata filter\nCREATE EXTENSION IF NOT EXISTS vector;\nCREATE TABLE chunks (\n  id bigserial PRIMARY KEY,\n  doc_id text,\n  content text,\n  embedding vector(1536)\n);\nCREATE INDEX ON chunks USING hnsw (embedding vector_cosine_ops);\n\nSELECT id, content, 1 - (embedding <=> $1) AS similarity\nFROM chunks\nWHERE doc_id = ANY($2)\nORDER BY embedding <=> $1\nLIMIT 5;\n```",
+     "useCases": "- Semantic search over docs, deduplication, clustering, recommendations, RAG retrieval.",
+     "mistakes": "- Mixing embeddings from different models in one index.\n- Ignoring keyword search (product codes, names) where vectors are weak.\n- Not filtering by permissions before returning results."
+    },
+    "questions": [
+     {
+      "question": "What are embeddings and how is similarity computed?",
+      "answer": "Embeddings are dense vectors learned so that semantically similar inputs land close together. Similarity is usually cosine similarity (angle between vectors) or dot product; Euclidean distance is also used. With normalised vectors cosine and dot product are equivalent, and ranking by either gives the same result.",
+      "followUps": "- How do you choose an embedding model?\n- What dimension trade-offs exist?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "How does HNSW work?",
+      "answer": "Hierarchical Navigable Small World builds a multi-layer proximity graph: upper layers are sparse with long-range links, lower layers dense. A search starts at the top, greedily moves to the closest neighbour, and descends layers, refining the candidate set at the bottom. It gives high recall with logarithmic-ish search time at the cost of memory and slower index builds.",
+      "followUps": "- What do `M` and `ef_search` control?\n- When would you choose IVF-PQ instead?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Explain cosine vs dot product vs Euclidean",
+     "Explain ANN indexes HNSW and IVF",
+     "Implement semantic search with pgvector or Chroma",
+     "Implement hybrid search with rank fusion",
+     "Explain filtering and multi-tenancy"
+    ],
+    "resources": [
+     {
+      "title": "pgvector",
+      "url": "https://github.com/pgvector/pgvector",
+      "kind": "repo"
+     },
+     {
+      "title": "Pinecone: What is a vector database",
+      "url": "https://www.pinecone.io/learn/vector-database/",
+      "kind": "article"
+     },
+     {
+      "title": "MTEB leaderboard",
+      "url": "https://huggingface.co/spaces/mteb/leaderboard",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "RAG Architecture",
+    "icon": "📚",
+    "summary": "Ingestion, chunking, retrieval, re-ranking, generation with citations, and RAG evaluation.",
+    "difficulty": "intermediate",
+    "tags": [
+     "rag",
+     "retrieval",
+     "llm"
+    ],
+    "sections": {
+     "concept": "**Retrieval-Augmented Generation** grounds an LLM's answer in your data: retrieve relevant chunks for a query and put them in the prompt. It reduces hallucination, keeps knowledge fresh without retraining, and enables citations and access control.",
+     "fundamentals": "Pipeline:\n1. **Ingest**: load documents, clean, extract text (PDF, HTML), keep metadata.\n2. **Chunk**: split into passages (by tokens/structure), with overlap.\n3. **Embed & index**: store vectors + metadata.\n4. **Retrieve**: embed query, ANN search (+ keyword), filter by permissions.\n5. **Re-rank** top candidates (cross-encoder) and select context.\n6. **Generate**: prompt with instructions, retrieved context and citations requirements.\n7. **Evaluate & monitor**.",
+     "advanced": "- **Chunking strategies**: fixed-size, recursive by structure, semantic, parent-child (retrieve small, return large), contextual chunk headers.\n- **Query transformation**: rewriting, multi-query, HyDE, decomposition.\n- **Hybrid retrieval** and rank fusion.\n- **Agentic RAG**: model decides when/what to retrieve iteratively.\n- **GraphRAG** for relationship-heavy corpora.\n- Long-context models vs RAG: trade-offs in cost, latency and precision.\n- Evaluation: retrieval metrics (recall@k, MRR, nDCG) and generation metrics (faithfulness, answer relevance), e.g. RAGAS-style or LLM-as-judge with human calibration.",
+     "examples": "```python\ndef answer(question: str, user):\n    q_vec = embed(question)\n    candidates = vector_store.search(q_vec, k=30, filter={\"tenant\": user.tenant})\n    candidates += keyword_index.search(question, k=30)\n    top = rerank(question, dedupe(candidates))[:6]\n\n    context = \"\\n\\n\".join(f\"<doc id='{c.id}'>\\n{c.text}\\n</doc>\" for c in top)\n    prompt = f\"\"\"Answer using only the documents below. Cite doc ids like [id].\nIf the answer isn't in the documents, say you don't know.\n\n{context}\n\nQuestion: {question}\"\"\"\n    return llm(prompt, temperature=0)\n```",
+     "useCases": "- Internal knowledge-base assistants, customer support bots, documentation search, legal/medical Q&A with citations.",
+     "mistakes": "- Poor chunking (splitting tables/code mid-way, no metadata).\n- Evaluating only the final answer, not retrieval quality.\n- Stuffing too many irrelevant chunks into the context.\n- Ignoring document permissions."
+    },
+    "questions": [
+     {
+      "question": "Walk me through designing a RAG system for company documentation.",
+      "answer": "Clarify scale, freshness, sources, permissions, latency and quality targets. Ingestion pipeline with connectors and incremental updates; structure-aware chunking with metadata (title, URL, ACLs); embeddings + vector index, plus BM25 for hybrid retrieval; permission filtering at query time; re-ranking; prompt with citations and an \"I don't know\" path; caching; observability (log queries, retrieved docs, feedback). Evaluate with a golden set: retrieval recall@k and answer faithfulness/relevance, iterate on chunking and retrieval first.",
+      "followUps": "- How do you keep the index fresh?\n- How do you handle tables and images in PDFs?",
+      "difficulty": "intermediate"
+     },
+     {
+      "question": "The RAG system gives wrong answers. How do you debug it?",
+      "answer": "Separate retrieval from generation. Check whether the right chunks were retrieved (log them; measure recall@k on a labelled set). If not: fix chunking, add metadata, hybrid search, query rewriting, better embeddings or re-ranking. If retrieval is right but the answer is wrong: improve the prompt, reduce noise in context, ordering of chunks, model choice, or add verification. Use evals to confirm each change helps.",
+      "followUps": "- What is \"lost in the middle\"?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Build an end-to-end RAG prototype",
+     "Compare 3 chunking strategies on an eval set",
+     "Add hybrid search and re-ranking",
+     "Measure recall@k and faithfulness",
+     "Explain RAG vs fine-tuning vs long context"
+    ],
+    "resources": [
+     {
+      "title": "Anthropic: Contextual Retrieval",
+      "url": "https://www.anthropic.com/news/contextual-retrieval",
+      "kind": "article"
+     },
+     {
+      "title": "RAGAS docs",
+      "url": "https://docs.ragas.io/",
+      "kind": "docs"
+     },
+     {
+      "title": "LlamaIndex: RAG concepts",
+      "url": "https://docs.llamaindex.ai/en/stable/understanding/rag/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "AI Agents & Tool Calling",
+    "icon": "🛠️",
+    "summary": "Tool/function calling, agent loops, planning, memory, multi-agent patterns and guardrails.",
+    "difficulty": "advanced",
+    "tags": [
+     "agents",
+     "tool-use",
+     "llm"
+    ],
+    "sections": {
+     "concept": "An **agent** is an LLM running in a loop: it decides which **tools** to call, observes results, and continues until the task is done. Tool calling lets models act (search, query databases, run code, call APIs) with structured arguments. Good agent engineering is mostly about **tool design, context management, guardrails and evaluation**.",
+     "fundamentals": "- **Tool calling**: you describe tools (name, description, JSON schema); the model returns a structured call; your code executes it and returns the result.\n- **Agent loop**: model → tool calls → results → model … until a final answer or step limit.\n- **Workflows vs agents**: predefined code paths (prompt chaining, routing, parallelisation) vs model-directed control flow. Prefer the simplest thing that works.\n- **Memory**: short-term (conversation/context), long-term (stored facts, vector memory).\n- **Planning**: let the model plan, then execute steps; re-plan on failure.\n- Stop conditions, max iterations, timeouts and budgets.",
+     "advanced": "- **Context engineering**: summarise/compact history, retrieve just-in-time, keep tool outputs concise.\n- **Multi-agent**: orchestrator-workers, evaluator-optimiser; parallel subagents for breadth.\n- **MCP (Model Context Protocol)** standardises how tools and data sources connect to models.\n- **Guardrails**: least-privilege tools, human-in-the-loop for irreversible actions, sandboxing code execution, prompt injection defences, output validation.\n- **Evaluation**: task success rate, trajectory evaluation, cost/latency per task.",
+     "examples": "```python\ntools = [{\n    \"name\": \"search_docs\",\n    \"description\": \"Search internal docs. Use for any question about company policies.\",\n    \"input_schema\": {\n        \"type\": \"object\",\n        \"properties\": {\"query\": {\"type\": \"string\"}},\n        \"required\": [\"query\"],\n    },\n}]\n\nmessages = [{\"role\": \"user\", \"content\": question}]\nfor _ in range(8):  # hard step limit\n    resp = client.messages.create(model=MODEL, max_tokens=1024, tools=tools, messages=messages)\n    messages.append({\"role\": \"assistant\", \"content\": resp.content})\n    if resp.stop_reason != \"tool_use\":\n        break\n    results = []\n    for block in resp.content:\n        if block.type == \"tool_use\":\n            output = run_tool(block.name, block.input)  # validate inputs!\n            results.append({\"type\": \"tool_result\", \"tool_use_id\": block.id, \"content\": output})\n    messages.append({\"role\": \"user\", \"content\": results})\n```",
+     "useCases": "- Coding agents, research assistants, customer support agents that can look up orders and issue refunds with approval, data analysis agents.",
+     "mistakes": "- Building a complex multi-agent system when a single prompt or simple workflow suffices.\n- Vague tool descriptions and overlapping tools that confuse the model.\n- Giving agents broad write permissions without confirmation steps.\n- No step limits or cost budgets."
+    },
+    "questions": [
+     {
+      "question": "How does tool calling work under the hood?",
+      "answer": "Tool definitions (names, descriptions, JSON schemas) are included in the model's context. The model was trained to emit a structured tool-use block when a tool would help. The application parses it, validates arguments, executes the tool, and sends the result back as a tool result message. The model then continues, possibly calling more tools, until it produces a final answer. The model never executes anything itself.",
+      "followUps": "- How do you make tools easy for a model to use correctly?\n- How do you handle tool errors?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "When should you use an agent vs a fixed workflow?",
+      "answer": "Use a **workflow** when steps are known and predictable: it's cheaper, faster, easier to test and debug. Use an **agent** when the path can't be predetermined (open-ended research, coding, multi-step troubleshooting) and you can tolerate higher cost/latency in exchange for flexibility. Start simple and add autonomy only when evals show it helps.",
+      "followUps": "- How do you evaluate an agent?\n- What guardrails would you add before letting an agent send emails?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Implement a tool-calling loop with step limits",
+     "Design 3 tools with clear descriptions and schemas",
+     "Explain workflow patterns (chaining, routing, orchestrator-workers)",
+     "Explain MCP",
+     "List agent guardrails for irreversible actions"
+    ],
+    "resources": [
+     {
+      "title": "Anthropic: Building effective agents",
+      "url": "https://www.anthropic.com/research/building-effective-agents",
+      "kind": "article"
+     },
+     {
+      "title": "Anthropic: Tool use docs",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview",
+      "kind": "docs"
+     },
+     {
+      "title": "Model Context Protocol",
+      "url": "https://modelcontextprotocol.io/",
+      "kind": "docs"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Model Evaluation",
+    "icon": "📏",
+    "summary": "Building eval sets, metrics, LLM-as-judge, human review, regression testing and online monitoring.",
+    "difficulty": "advanced",
+    "tags": [
+     "evals",
+     "llm",
+     "quality"
+    ],
+    "sections": {
+     "concept": "Evals are the unit tests of AI systems. Because outputs are non-deterministic and open-ended, you need a **representative dataset**, **clear success criteria**, **automatic graders** where possible, **human review** for calibration, and **production monitoring** to catch regressions and drift.",
+     "fundamentals": "- Start with real (or realistic) inputs covering common cases and edge cases; 50–200 examples go a long way.\n- Define success criteria per task: exact match, contains, schema-valid, rubric score.\n- **Code-based graders** (exact match, regex, JSON schema, unit tests for code).\n- **LLM-as-judge** with explicit rubrics; calibrate against human labels.\n- **Human evaluation** for subjective quality and to build the golden set.\n- Track quality, latency, cost per request.",
+     "advanced": "- **Pairwise comparisons** reduce judge bias vs absolute scores; randomise order to avoid position bias.\n- **Benchmarks** (MMLU, HumanEval, SWE-bench) vs task-specific evals: benchmarks rarely predict your use case.\n- **Regression suites** in CI for prompt/model changes.\n- **Online evals**: user feedback, implicit signals, sampling production traffic for review, A/B tests.\n- **Statistical significance**: confidence intervals, enough samples.\n- Red-teaming and safety evals.",
+     "examples": "```python\nimport json\n\ndef grade_extraction(output: str, expected: dict) -> dict:\n    try:\n        data = json.loads(output)\n    except json.JSONDecodeError:\n        return {\"valid_json\": False, \"field_accuracy\": 0.0}\n    hits = sum(data.get(k) == v for k, v in expected.items())\n    return {\"valid_json\": True, \"field_accuracy\": hits / len(expected)}\n\nJUDGE_PROMPT = \"\"\"Rate the answer's faithfulness to the context from 1-5.\n5 = every claim is supported by the context. 1 = mostly unsupported.\n<context>{context}</context>\n<answer>{answer}</answer>\nReturn JSON: {{\"score\": int, \"unsupported_claims\": [str]}}\"\"\"\n```",
+     "useCases": "- Choosing between two models or prompts with evidence.\n- Preventing regressions when upgrading models.\n- Measuring RAG faithfulness and agent task success.",
+     "mistakes": "- \"Vibe checking\" a handful of examples.\n- Using an LLM judge without validating it against humans.\n- Evaluating on data that leaked into prompts or training.\n- Optimising a single metric that doesn't reflect user value."
+    },
+    "questions": [
+     {
+      "question": "How would you evaluate an LLM-powered feature before launch?",
+      "answer": "Define what \"good\" means with stakeholders, build a dataset from real inputs including hard and adversarial cases, choose graders (code-based where possible, LLM-judge with rubrics calibrated against human labels), measure quality + latency + cost across candidate prompts/models, review failures qualitatively, set launch thresholds, add the suite to CI, and plan online monitoring (feedback, sampled human review, A/B tests).",
+      "followUps": "- How do you mitigate LLM-judge biases?\n- How many examples do you need?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "What is LLM-as-a-judge and what are its pitfalls?",
+      "answer": "Using a model to grade outputs against a rubric or compare two outputs. It scales human-like judgement cheaply. Pitfalls: position bias, verbosity bias, self-preference, inconsistency, and leniency. Mitigate with clear rubrics, pairwise comparisons with randomised order, reference answers, asking for reasoning before the score, and validating agreement with human labels.",
+      "followUps": "- How do you measure judge-human agreement?",
+      "difficulty": "intermediate"
+     }
+    ],
+    "checklist": [
+     "Build a 50-example eval set for one task",
+     "Write code-based graders and an LLM-judge rubric",
+     "Calibrate the judge against human labels",
+     "Add evals to CI",
+     "Design online monitoring for a launched feature"
+    ],
+    "resources": [
+     {
+      "title": "Anthropic: Create strong empirical evaluations",
+      "url": "https://docs.anthropic.com/en/docs/test-and-evaluate/develop-tests",
+      "kind": "docs"
+     },
+     {
+      "title": "Hamel Husain: Your AI product needs evals",
+      "url": "https://hamel.dev/blog/posts/evals/",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "Fine-tuning",
+    "icon": "🎛️",
+    "summary": "When to fine-tune, SFT, LoRA/QLoRA, preference tuning, data preparation and evaluation.",
+    "difficulty": "advanced",
+    "tags": [
+     "fine-tuning",
+     "llm",
+     "training"
+    ],
+    "sections": {
+     "concept": "Fine-tuning adapts a pre-trained model's weights to your task or style using additional training data. It's powerful for consistent formats, tone, domain behaviour and smaller/cheaper models, but it's usually the **last** lever after prompting and RAG, because it's slower to iterate, needs quality data, and doesn't reliably add new factual knowledge.",
+     "fundamentals": "- **Prompting → RAG → fine-tuning** decision ladder.\n- **SFT**: train on input/output pairs demonstrating desired behaviour.\n- **PEFT**: LoRA adds small low-rank matrices to layers; train only those. **QLoRA** fine-tunes a quantised base model to save memory.\n- **Data**: quality > quantity; consistent format; diverse; deduplicated; held-out eval split.\n- **Hyperparameters**: learning rate, epochs, batch size, LoRA rank.\n- **Overfitting & catastrophic forgetting** risks.",
+     "advanced": "- **Preference tuning**: DPO/ORPO/RLHF on chosen vs rejected pairs.\n- **Distillation**: train a small model on a large model's outputs.\n- Synthetic data generation and filtering.\n- Merging LoRA adapters; serving multiple adapters on one base model.\n- Evaluating fine-tunes against the base model + prompt baseline.",
+     "examples": "```python\nfrom peft import LoraConfig, get_peft_model\nfrom transformers import AutoModelForCausalLM\n\nmodel = AutoModelForCausalLM.from_pretrained(BASE_MODEL, load_in_4bit=True)\nconfig = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05,\n                    target_modules=[\"q_proj\", \"v_proj\"], task_type=\"CAUSAL_LM\")\nmodel = get_peft_model(model, config)\nmodel.print_trainable_parameters()  # typically < 1% of total parameters\n# ...train with your SFT dataset, evaluate on a held-out set vs the base model\n```",
+     "useCases": "- Consistent JSON extraction with a small, cheap model.\n- Brand voice or domain-specific style.\n- Classification at very high volume where latency/cost matter.",
+     "mistakes": "- Fine-tuning to inject facts that change (use RAG).\n- Tiny, inconsistent or noisy datasets.\n- No baseline comparison against a well-prompted base model."
+    },
+    "questions": [
+     {
+      "question": "When would you fine-tune instead of using prompting or RAG?",
+      "answer": "When you need consistent behaviour, format or style that prompting can't reliably achieve; when you want to move a task to a smaller, cheaper, faster model; when the prompt has grown huge with examples; or for specialised classification at scale. Use RAG for knowledge that changes or must be cited. Often the best systems combine RAG with a fine-tuned model.",
+      "followUps": "- How much data do you need?\n- How do you know the fine-tune actually helped?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Explain LoRA.",
+      "answer": "LoRA freezes the pre-trained weights and learns a low-rank update ΔW = BA for selected weight matrices (A: r×d, B: d×r with small rank r). Only A and B are trained, cutting trainable parameters by orders of magnitude, reducing memory and enabling many small task-specific adapters on one base model. QLoRA additionally quantises the frozen base to 4-bit.",
+      "followUps": "- What does the rank r trade off?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Explain the prompting → RAG → fine-tuning ladder",
+     "Explain SFT, LoRA and QLoRA",
+     "Prepare a clean SFT dataset with an eval split",
+     "Compare a fine-tune vs prompted baseline",
+     "Explain DPO at a high level"
+    ],
+    "resources": [
+     {
+      "title": "Hugging Face PEFT docs",
+      "url": "https://huggingface.co/docs/peft/index",
+      "kind": "docs"
+     },
+     {
+      "title": "LoRA paper",
+      "url": "https://arxiv.org/abs/2106.09685",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "LLM Application Architecture",
+    "icon": "🏗️",
+    "summary": "Production LLM apps: gateways, streaming, caching, structured outputs, observability, cost and safety.",
+    "difficulty": "advanced",
+    "tags": [
+     "llm",
+     "architecture",
+     "production"
+    ],
+    "sections": {
+     "concept": "Shipping LLM features means building normal reliable software around a non-deterministic, slow, expensive dependency. Key concerns: **latency (streaming)**, **cost**, **reliability (retries, fallbacks)**, **structured outputs**, **observability**, **safety**, and **evaluation in the loop**.",
+     "fundamentals": "- **Streaming** tokens (SSE) for perceived latency.\n- **Structured outputs** via JSON schema / tool calling, validated with pydantic/zod.\n- **Retries** with backoff for rate limits and transient errors; timeouts; fallbacks to alternate models.\n- **Caching**: prompt caching for long static prefixes; response caching for repeated queries.\n- **Model routing**: cheap model for easy tasks, strong model for hard ones.\n- **Observability**: log prompts, responses, tokens, latency, cost, user feedback (with privacy controls).\n- **Rate limiting** and quotas per user.",
+     "advanced": "- **LLM gateway** layer: provider abstraction, keys, budgets, logging, routing.\n- **Background jobs** for long-running generations and agents.\n- **Guardrails**: input/output moderation, PII redaction, prompt injection defences.\n- **Versioning** prompts and models; shadow deployments; A/B tests.\n- Batch APIs for offline workloads at lower cost.\n- Data privacy, retention, and compliance.",
+     "examples": "```ts\n// Next.js route handler streaming tokens to the browser (shape is illustrative)\nexport async function POST(req: Request) {\n  const { messages } = ChatSchema.parse(await req.json());\n  const stream = await llm.stream({ model: MODEL, messages, max_tokens: 1024 });\n\n  return new Response(\n    new ReadableStream({\n      async start(controller) {\n        for await (const chunk of stream) {\n          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\\n\\n`));\n        }\n        controller.close();\n      },\n    }),\n    { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' } },\n  );\n}\n```",
+     "useCases": "- Chat assistants, document processing pipelines, AI features embedded in SaaS products.",
+     "mistakes": "- No timeouts or fallbacks; one provider outage takes down the feature.\n- Unbounded costs (no per-user limits, huge contexts).\n- Not logging enough to debug bad outputs.\n- Trusting model output in SQL, HTML or shell commands."
+    },
+    "questions": [
+     {
+      "question": "How would you reduce latency and cost of an LLM feature?",
+      "answer": "Measure first (tokens in/out, TTFT, total latency). Then: stream responses; shorten prompts and outputs; use prompt caching for static prefixes; cache responses for repeated queries; route easy requests to smaller models; parallelise independent calls; reduce retrieved context with better re-ranking; use batch APIs for offline jobs; set max_tokens; precompute where possible.",
+      "followUps": "- How does prompt caching work?\n- How do you trade quality for cost safely?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "How do you make LLM output reliable enough for production?",
+      "answer": "Constrain it (structured outputs/tool calling with schemas), validate and retry on invalid output, keep temperature low for deterministic tasks, give examples, ground with retrieval, add verification steps for critical outputs, design UX for uncertainty (citations, edit/undo, human review), and run evals continuously, including regression tests for model upgrades.",
+      "followUps": "- How do you handle a model provider deprecating a model?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Implement streaming responses end to end",
+     "Validate structured output with a schema and retry",
+     "Add retries, timeouts and model fallback",
+     "Log tokens, latency and cost per request",
+     "Explain prompt caching and model routing"
+    ],
+    "resources": [
+     {
+      "title": "Anthropic: Streaming messages",
+      "url": "https://docs.anthropic.com/en/docs/build-with-claude/streaming",
+      "kind": "docs"
+     },
+     {
+      "title": "Chip Huyen: Building LLM applications for production",
+      "url": "https://huyenchip.com/2023/04/11/llm-engineering.html",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   },
+   {
+    "title": "AI System Design",
+    "icon": "🗺️",
+    "summary": "Designing AI products end to end: requirements, data, models, retrieval, serving, evals and safety.",
+    "difficulty": "advanced",
+    "tags": [
+     "system-design",
+     "llm",
+     "architecture"
+    ],
+    "sections": {
+     "concept": "AI system design interviews combine classic system design with ML/LLM-specific concerns: **data pipelines**, **model choice**, **retrieval**, **serving and scaling inference**, **evaluation and feedback loops**, **cost**, and **safety**. Interviewers want to see you reason about quality as a first-class requirement.",
+     "fundamentals": "A framework:\n1. **Problem & success metrics**: user goal, business metric, quality metric, latency and cost budgets.\n2. **Data**: sources, freshness, privacy, labelling, feedback collection.\n3. **Approach**: rules vs classic ML vs LLM; prompting vs RAG vs fine-tuning vs agents.\n4. **Architecture**: ingestion, retrieval, orchestration, model gateway, caching, storage.\n5. **Evaluation**: offline evals, online metrics, human review.\n6. **Serving**: latency (streaming), throughput, autoscaling GPUs or provider limits, fallbacks.\n7. **Safety & privacy**: abuse, injection, PII, compliance.\n8. **Iteration**: feedback loops and monitoring.",
+     "advanced": "- Self-hosted inference: vLLM, continuous batching, quantisation, GPU utilisation.\n- Multi-tenant isolation in retrieval and memory.\n- Cost modelling: tokens × requests × price; caching hit rates.\n- Human-in-the-loop workflows and escalation.\n- Drift detection and model upgrade strategy.",
+     "examples": "```text\nDesign: AI customer-support assistant for an e-commerce company\n- Goals: deflect 30% of tickets, CSAT ≥ current, p95 first token < 2s\n- Data: help-center articles, past tickets (PII-redacted), order API\n- Approach: RAG over help center + tools (lookup_order, create_return w/ confirmation)\n- Architecture: chat UI -> API -> orchestrator (agent w/ 3 tools, step limit)\n  -> retrieval (hybrid + rerank) -> LLM gateway (routing, caching, fallbacks)\n- Safety: injection-resistant tool permissions, refunds need human approval, PII redaction\n- Evals: golden Q&A set, faithfulness judge, tool-call accuracy; online CSAT + escalation rate\n- Ops: log traces, cost per conversation, weekly failure review -> new eval cases\n```",
+     "useCases": "- Support assistants, semantic search, document intelligence pipelines, coding assistants, recommendation explanations.",
+     "mistakes": "- Jumping to \"use GPT/Claude\" without defining success metrics.\n- Ignoring evaluation and feedback loops.\n- Forgetting cost and latency budgets.\n- No plan for abuse and prompt injection."
+    },
+    "questions": [
+     {
+      "question": "Design a semantic search system for millions of documents.",
+      "answer": "Clarify query types, latency, freshness, languages, permissions. Ingestion: connectors → parsing → chunking → embedding (batch + incremental) → vector index (sharded HNSW) + inverted index. Query: embed, hybrid retrieve, permission filter, re-rank top-k with a cross-encoder, optionally generate an answer with citations. Scale: shard by tenant/doc id, replicas for QPS, cache popular queries/embeddings. Evaluate with labelled relevance judgements (nDCG, recall@k) and click-through; monitor drift; plan re-embedding when changing models.",
+      "followUps": "- How do you handle permission changes quickly?\n- How would you evaluate relevance without labels?",
+      "difficulty": "advanced"
+     },
+     {
+      "question": "Design an AI coding assistant feature (e.g. code review bot).",
+      "answer": "Inputs: diff, repo context (retrieved related files, symbols), PR description. Pipeline: trigger on PR events → gather context (code search, dependency graph) → LLM review with structured comments (file, line, severity, rationale) → filter low-confidence/noisy comments → post. Concerns: context window limits, latency (async is fine), cost per PR, false positive rate (developer trust), security (don't leak secrets, sandbox execution), evaluation on historical PRs with known bugs, and feedback (thumbs up/down) to improve.",
+      "followUps": "- How do you keep false positives low?",
+      "difficulty": "advanced"
+     }
+    ],
+    "checklist": [
+     "Practice the AI system design framework on 4 problems",
+     "Define quality, latency and cost metrics for each design",
+     "Explain build vs buy for models and vector DBs",
+     "Explain inference scaling (batching, quantisation)",
+     "Include safety and evaluation in every design"
+    ],
+    "resources": [
+     {
+      "title": "Chip Huyen: Designing Machine Learning Systems",
+      "url": "https://www.oreilly.com/library/view/designing-machine-learning/9781098107956/",
+      "kind": "book"
+     },
+     {
+      "title": "Chip Huyen: AI Engineering",
+      "url": "https://www.oreilly.com/library/view/ai-engineering/9781098166298/",
+      "kind": "book"
+     },
+     {
+      "title": "Eugene Yan: Patterns for building LLM-based systems",
+      "url": "https://eugeneyan.com/writing/llm-patterns/",
+      "kind": "article"
+     }
+    ],
+    "children": []
+   }
+  ]
+ }
+]
