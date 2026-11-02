@@ -2,6 +2,8 @@
 
 import {
   BookOpenCheck,
+  ArrowDown,
+  ArrowUp,
   ChevronRight,
   FileText,
   LayoutDashboard,
@@ -20,7 +22,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { useDeleteTrack, useTree } from "@/lib/hooks";
+import { useDeleteTrack, useReorderTracks, useTree } from "@/lib/hooks";
 import type { Track, TreeTopic } from "@/lib/types";
 import { useLocalStorage } from "@/lib/use-local-storage";
 import { TopicDialog, TrackDialog } from "./dialogs";
@@ -49,7 +51,16 @@ export function Sidebar({ onSearch, onNavigate }: { onSearch: () => void; onNavi
   const [topicDialog, setTopicDialog] = useState<{ open: boolean; trackId?: string; parentId?: string | null }>({ open: false });
   const [deleting, setDeleting] = useState<Track | null>(null);
   const del = useDeleteTrack();
+  const reorderTracks = useReorderTracks();
   const router = useRouter();
+  const moveTrack = (id: string, dir: -1 | 1) => {
+    const ids = (tree.data?.tracks ?? []).map((t) => t.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    reorderTracks.mutate(ids);
+  };
 
   const childrenOf = useMemo(() => {
     const m = new Map<string, TreeTopic[]>();
@@ -172,7 +183,7 @@ export function Sidebar({ onSearch, onNavigate }: { onSearch: () => void; onNavi
         )}
 
         <ul className="space-y-px">
-          {tree.data?.tracks.map((track) => {
+          {tree.data?.tracks.map((track, tIndex) => {
             const key = `track:${track.id}`;
             const open = isOpen(key, true);
             const topics = childrenOf.get(key) ?? [];
@@ -226,6 +237,28 @@ export function Sidebar({ onSearch, onNavigate }: { onSearch: () => void; onNavi
                           >
                             Add topic
                           </MenuItem>
+                          {tIndex > 0 && (
+                            <MenuItem
+                              icon={<ArrowUp />}
+                              onClick={() => {
+                                close();
+                                moveTrack(track.id, -1);
+                              }}
+                            >
+                              Move up
+                            </MenuItem>
+                          )}
+                          {tIndex < (tree.data?.tracks.length ?? 0) - 1 && (
+                            <MenuItem
+                              icon={<ArrowDown />}
+                              onClick={() => {
+                                close();
+                                moveTrack(track.id, 1);
+                              }}
+                            >
+                              Move down
+                            </MenuItem>
+                          )}
                           <MenuSeparator />
                           <MenuItem
                             danger

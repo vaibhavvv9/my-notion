@@ -85,17 +85,32 @@ function TitleInput({ value, onSave }: { value: string; onSave: (v: string) => v
 
 function SummaryInput({ value, onSave }: { value: string; onSave: (v: string) => void }) {
   const [v, setV] = useState(value);
+  const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => setV(value), [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [v]);
   return (
-    <input
+    <textarea
+      ref={ref}
+      rows={1}
       value={v}
-      onChange={(e) => setV(e.target.value)}
+      onChange={(e) => setV(e.target.value.replace(/\n/g, " "))}
       onBlur={() => v.trim() !== value && onSave(v.trim())}
-      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
       maxLength={500}
       aria-label="Summary"
       placeholder="Add a one-line summary…"
-      className="w-full bg-transparent text-[15px] text-muted outline-none placeholder:text-faint"
+      className="w-full resize-none overflow-hidden bg-transparent text-[15px] text-muted outline-none placeholder:text-faint"
     />
   );
 }

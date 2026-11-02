@@ -31,6 +31,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  if (pathname === "/login") return <>{children}</>;
+
   return (
     <ShellCtx.Provider value={{ openSearch: () => setSearchOpen(true), openSidebar: () => setMobileOpen(true) }}>
       <div className="flex h-dvh">

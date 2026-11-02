@@ -89,8 +89,8 @@ export function Dashboard() {
       ) : (
         <>
           {/* Overall */}
-          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-line p-4 sm:col-span-2 lg:col-span-1">
+          <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="col-span-2 rounded-xl border border-line p-4 lg:col-span-1">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
                 <Target className="size-3.5" /> Overall progress
               </div>

@@ -103,12 +103,12 @@ export function TrackPage({ id }: { id: string }) {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [order, setOrder] = useState<string[] | null>(null);
+  const [order, setOrder] = useState<Record<string, string[]>>({});
 
   const track = tree.data?.tracks.find((t) => t.id === id);
   const all = useMemo(() => topicsQ.data ?? [], [topicsQ.data]);
 
-  useEffect(() => setOrder(null), [topicsQ.data]);
+  useEffect(() => setOrder({}), [topicsQ.data]);
   useEffect(() => {
     if (track) document.title = `${track.name} · Interview Prep`;
   }, [track]);
@@ -130,12 +130,14 @@ export function TrackPage({ id }: { id: string }) {
     return m;
   }, [all]);
 
-  const roots = useMemo(() => {
-    const r = byParent.get(null) ?? [];
-    if (!order) return r;
-    const map = new Map(r.map((t) => [t.id, t]));
-    return order.map((i) => map.get(i)!).filter(Boolean);
-  }, [byParent, order]);
+  const siblings = (parentId: string | null) => {
+    const list = byParent.get(parentId) ?? [];
+    const o = order[parentId ?? "root"];
+    if (!o) return list;
+    const map = new Map(list.map((t) => [t.id, t]));
+    return o.map((i) => map.get(i)!).filter(Boolean);
+  };
+  const roots = siblings(null);
 
   const filtered = useMemo(() => {
     const term = q.toLowerCase();
@@ -163,23 +165,30 @@ export function TrackPage({ id }: { id: string }) {
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    const ids = roots.map((r) => r.id);
-    const next = arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
-    setOrder(next);
+    const dragged = all.find((t) => t.id === active.id);
+    const target = all.find((t) => t.id === over.id);
+    // Only reorder within the same parent; use "Move to…" to change parents.
+    if (!dragged || !target || dragged.parentId !== target.parentId) return;
+    const ids = siblings(dragged.parentId).map((r) => r.id);
+    const next = arrayMove(ids, ids.indexOf(dragged.id), ids.indexOf(target.id));
+    setOrder((o) => ({ ...o, [dragged.parentId ?? "root"]: next }));
     reorder.mutate(next);
   };
 
-  const renderTree = (list: TopicListItem[], depth: number): React.ReactNode =>
-    list.map((t) => {
-      const kids = byParent.get(t.id) ?? [];
-      const open = expanded[t.id] ?? false;
-      return (
-        <div key={t.id}>
-          <Row t={t} depth={depth} childCount={kids.length} open={open} onToggle={() => setExpanded((e) => ({ ...e, [t.id]: !open }))} sortable={depth === 0} />
-          {open && kids.length > 0 && <div>{renderTree(kids, depth + 1)}</div>}
-        </div>
-      );
-    });
+  const renderTree = (list: TopicListItem[], depth: number): React.ReactNode => (
+    <SortableContext items={list.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+      {list.map((t) => {
+        const kids = siblings(t.id);
+        const open = expanded[t.id] ?? false;
+        return (
+          <div key={t.id}>
+            <Row t={t} depth={depth} childCount={kids.length} open={open} onToggle={() => setExpanded((e) => ({ ...e, [t.id]: !open }))} sortable />
+            {open && kids.length > 0 && <div>{renderTree(kids, depth + 1)}</div>}
+          </div>
+        );
+      })}
+    </SortableContext>
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl animate-fade-in px-5 py-8 sm:px-10 sm:py-12">
@@ -280,13 +289,11 @@ export function TrackPage({ id }: { id: string }) {
           )
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext items={roots.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-              {renderTree(roots, 0)}
-            </SortableContext>
+            {renderTree(roots, 0)}
           </DndContext>
         )}
       </div>
-      {!filtering && all.length > 1 && <p className="mt-3 text-xs text-faint">Drag the handle to reorder topics. Expand a topic to see its subtopics.</p>}
+      {!filtering && all.length > 1 && <p className="mt-3 text-xs text-faint">Drag the handle to reorder topics within the same level. Use “Move to…” on a topic page to change its parent.</p>}
 
       <TopicDialog open={creating} onClose={() => setCreating(false)} trackId={id} parentId={null} />
       <TrackDialog open={editing} onClose={() => setEditing(false)} track={track} />

@@ -101,11 +101,13 @@ const DDL = [
 ];
 
 function resolveUrl(): string {
-  const url = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
-  if (url) return url;
-  const dir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dir, { recursive: true });
-  return `file:${path.join(dir, "prep.db")}`;
+  const url = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL || `file:${path.join(process.cwd(), "data", "prep.db")}`;
+  if (url.startsWith("file:")) {
+    // Make sure the folder for a local SQLite file exists.
+    const file = url.slice("file:".length);
+    fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+  }
+  return url;
 }
 
 type Cache = { client?: Client; db?: DB; ready?: Promise<DB> };

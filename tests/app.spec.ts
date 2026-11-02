@@ -181,3 +181,27 @@ test("mobile layout uses a drawer for navigation @mobile", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   expect(overflow).toBe(false);
 });
+
+test("topics can be reordered with drag handles and the order persists", async ({ page, request }) => {
+  const track = await (await request.post("/api/tracks", { data: { name: `Reorder ${uid()}` } })).json();
+  for (const title of ["Alpha", "Bravo", "Charlie"]) {
+    await request.post("/api/topics", { data: { trackId: track.id, title } });
+  }
+  await page.goto(`/tracks/${track.id}`);
+  const titles = () => page.locator("main a[href^='/topics/'] span.font-medium").allInnerTexts();
+  await expect.poll(titles).toEqual(["Alpha", "Bravo", "Charlie"]);
+
+  // Keyboard drag: pick up Alpha, move it down twice, drop.
+  const handle = page.getByRole("button", { name: "Reorder Alpha" });
+  await handle.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect.poll(titles).toEqual(["Bravo", "Charlie", "Alpha"]);
+
+  await page.waitForTimeout(500);
+  await page.reload();
+  await expect.poll(titles).toEqual(["Bravo", "Charlie", "Alpha"]);
+  await request.delete(`/api/tracks/${track.id}`);
+});

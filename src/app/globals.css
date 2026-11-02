@@ -146,6 +146,13 @@ body {
   outline-offset: 1px;
   border-radius: 4px;
 }
+/* Text fields carry their own focus styling (or are inline, Notion-style). */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[cmdk-input]:focus-visible {
+  outline: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

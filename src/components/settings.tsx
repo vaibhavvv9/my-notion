@@ -1,7 +1,7 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { Download, Monitor, Moon, Sun, Upload } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, LogOut, Monitor, Moon, Sun, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -26,6 +26,7 @@ export function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<{ name: string; data: unknown } | null>(null);
   const [importing, setImporting] = useState(false);
+  const auth = useQuery({ queryKey: ["auth"], queryFn: () => api.get<{ enabled: boolean }>("/api/auth") });
 
   const options: { value: ThemePref; label: string; icon: React.ReactNode }[] = [
     { value: "light", label: "Light", icon: <Sun className="size-4" /> },
@@ -120,6 +121,30 @@ export function Settings() {
             </div>
           ))}
         </dl>
+      </Section>
+
+      <Section
+        title="Access"
+        description={
+          auth.data?.enabled
+            ? "This workspace is password protected."
+            : "Set the APP_PASSWORD environment variable to require a password (recommended when deployed publicly)."
+        }
+      >
+        {auth.data?.enabled ? (
+          <Button
+            icon={<LogOut className="size-4" />}
+            onClick={async () => {
+              await api.del("/api/auth");
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload after sign-out
+              window.location.href = "/login";
+            }}
+          >
+            Sign out
+          </Button>
+        ) : (
+          <p className="text-sm text-muted">Open access: anyone who can reach this URL can view and edit.</p>
+        )}
       </Section>
 
       <ConfirmDialog

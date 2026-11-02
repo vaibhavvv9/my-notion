@@ -25,6 +25,10 @@ async function request<T>(method: string, url: string, data?: unknown): Promise<
   } catch {
     /* non-JSON body */
   }
+  if (res.status === 401 && typeof window !== "undefined" && window.location.pathname !== "/login") {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload clears cached data
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+  }
   if (!res.ok) {
     const msg = (json as { error?: string } | undefined)?.error ?? `Request failed (${res.status})`;
     throw new ApiError(res.status, msg);
